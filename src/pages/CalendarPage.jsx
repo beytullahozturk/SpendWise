@@ -12,6 +12,7 @@ const EXPENSE_CATEGORIES = [
 export default function CalendarPage({ user }) {
     const [date, setDate] = useState(new Date());
     const [plannedTxns, setPlannedTxns] = useState([]);
+    const [subscriptions, setSubscriptions] = useState([]);
     const [amount, setAmount] = useState('');
     const [title, setTitle] = useState('');
     const [category, setCategory] = useState('');
@@ -39,19 +40,46 @@ export default function CalendarPage({ user }) {
         return () => unsubscribe();
     }, [user.uid]);
 
+    // Fetch active subscriptions
+    useEffect(() => {
+        const q = query(
+            collection(db, 'subscriptions'),
+            where('uid', '==', user.uid),
+            where('status', '==', 'active')
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const data = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            setSubscriptions(data);
+        });
+
+        return () => unsubscribe();
+    }, [user.uid]);
+
     // Helper to check if a day has events
     const getTileContent = ({ date, view }) => {
         if (view === 'month') {
             const dateStr = date.toISOString().split('T')[0];
             const events = plannedTxns.filter(t => t.date === dateStr);
+            const activeSubs = subscriptions.filter(s => s.billingDay === date.getDate());
 
-            if (events.length > 0) {
+            if (events.length > 0 || activeSubs.length > 0) {
                 return (
-                    <div className="calendar-tile-content">
+                    <div className="calendar-tile-content flex items-center justify-center gap-0.5">
                         {events.map((evt, i) => (
                             <div
-                                key={i}
+                                key={`evt-${i}`}
                                 className={`calendar-dot ${evt.isCompleted ? 'dot-completed' : 'dot-expense'}`}
+                            />
+                        ))}
+                        {activeSubs.map((sub, i) => (
+                            <div
+                                key={`sub-${i}`}
+                                className="w-1.5 h-1.5 rounded-full bg-indigo-500"
+                                title={sub.name}
                             />
                         ))}
                     </div>
@@ -99,11 +127,9 @@ export default function CalendarPage({ user }) {
             setAmount('');
             setTitle('');
             setCategory('');
-            setPaymentMethod('cash');
             setRecurrence('none');
-            setRecurrenceCount(12);
         } catch (error) {
-            console.error("Error adding planned txn:", error);
+            console.error("Error adding planned transaction:", error);
             alert("Bir hata oluştu.");
         } finally {
             setIsSubmitting(false);
@@ -111,201 +137,224 @@ export default function CalendarPage({ user }) {
     };
 
     const handleComplete = async (txn) => {
-        // 1. Add to actual transactions
+        if (!confirm(`${txn.title} işlemini tamamlandı olarak işaretlemek istiyor musunuz?`)) return;
+
         await addDoc(collection(db, 'transactions'), {
             uid: user.uid,
             title: txn.title,
             amount: txn.amount,
-            type: 'expense', // Assuming planned are usually expenses
+            type: 'expense',
             category: txn.category,
             paymentMethod: txn.paymentMethod || 'cash',
             date: txn.date,
             createdAt: serverTimestamp()
         });
 
-        // 2. Mark as completed or delete? Let's mark as completed to keep history
         await updateDoc(doc(db, 'planned_transactions', txn.id), {
             isCompleted: true
         });
     };
 
     const handleDelete = async (id) => {
-        await deleteDoc(doc(db, 'planned_transactions', id));
+        if (confirm('Bu planlı işlemi silmek istediğinize emin misiniz?')) {
+            await deleteDoc(doc(db, 'planned_transactions', id));
+        }
     };
 
+    // Filter events for selected date
     const selectedDateStr = date.toISOString().split('T')[0];
-    const selectedDayEvents = plannedTxns.filter(t => t.date === selectedDateStr);
+    const eventsForDate = plannedTxns.filter(t => t.date === selectedDateStr);
+    const subsForDate = subscriptions.filter(s => s.billingDay === date.getDate());
 
     return (
-        <div className="p-4 lg:p-8 max-w-5xl mx-auto pb-24 lg:pb-8">
-            <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-6 flex items-center gap-2">
+        <div className="max-w-6xl mx-auto p-4 lg:p-8 pb-24 lg:pb-8">
+            <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-6">
                 <CalIcon className="text-indigo-600 dark:text-indigo-400" />
-                Planlı Ödemeler & Takvim
+                Ödeme Takvimi
             </h2>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Calendar Section */}
-                <div className="lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+                {/* Calendar View */}
+                <div className="lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700">
                     <Calendar
                         onChange={setDate}
                         value={date}
                         tileContent={getTileContent}
-                        className="w-full text-sm"
+                        className="w-full border-none font-sans text-slate-700 dark:text-slate-200"
                         locale="tr-TR"
                     />
                 </div>
 
-                {/* Day Details & Add Form */}
+                {/* Details Side Panel */}
                 <div className="space-y-6">
-                    {/* Add Form */}
+                    {/* Events List */}
                     <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
-                        <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-4 text-sm uppercase tracking-wider">
-                            {date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })} İçin Ekle
-                        </h3>
-                        <form onSubmit={handleAddPlanned} className="space-y-3">
-                            <input
-                                type="text"
-                                placeholder="Başlık (Örn: Kira)"
-                                required
-                                className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                                value={title}
-                                onChange={(e) => setTitle(e.target.value)}
-                            />
-                            <div className="flex gap-2">
-                                <input
-                                    type="number"
-                                    placeholder="Tutar"
-                                    required
-                                    className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                                    value={amount}
-                                    onChange={(e) => setAmount(e.target.value)}
-                                />
-                                <select
-                                    className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                                    value={category}
-                                    required
-                                    onChange={(e) => setCategory(e.target.value)}
-                                >
-                                    <option value="">Kategori</option>
-                                    {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
-                            </div>
-
-                            {/* Payment Method Selection */}
-                            <div className="flex gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setPaymentMethod('cash')}
-                                    className={`flex-1 py-1.5 px-2 rounded-lg flex items-center justify-center gap-1 text-xs font-medium transition-all ${paymentMethod === 'cash'
-                                        ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
-                                        : 'bg-slate-50 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border border-transparent'
-                                        }`}
-                                >
-                                    <Banknote size={14} /> Nakit
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setPaymentMethod('credit_card')}
-                                    className={`flex-1 py-1.5 px-2 rounded-lg flex items-center justify-center gap-1 text-xs font-medium transition-all ${paymentMethod === 'credit_card'
-                                        ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
-                                        : 'bg-slate-50 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border border-transparent'
-                                        }`}
-                                >
-                                    <CreditCard size={14} /> Kredi Kartı
-                                </button>
-                            </div>
-
-                            {/* Recurrence Options */}
-                            <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
-                                <label className="block text-xs font-semibold text-slate-500 mb-2">Tekrar Seçenekleri</label>
-                                <div className="flex gap-2 mb-2">
-                                    <select
-                                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs outline-none"
-                                        value={recurrence}
-                                        onChange={(e) => setRecurrence(e.target.value)}
-                                    >
-                                        <option value="none">Tekrarlama Yok</option>
-                                        <option value="monthly">Her Ay</option>
-                                        <option value="weekly">Her Hafta</option>
-                                    </select>
-                                    {recurrence !== 'none' && (
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            max="60"
-                                            value={recurrenceCount}
-                                            onChange={(e) => setRecurrenceCount(e.target.value)}
-                                            className="w-20 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs outline-none text-center"
-                                            title="Kaç kez tekrar etsin?"
-                                        />
-                                    )}
-                                </div>
-                                {recurrence !== 'none' && (
-                                    <p className="text-[10px] text-indigo-500">
-                                        * Bu tarihten başlayarak <strong>{recurrenceCount}</strong> kez otomatik oluşturulacak.
-                                    </p>
-                                )}
-                            </div>
-
-                            <button
-                                type="submit"
-                                disabled={isSubmitting}
-                                className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-lg text-sm font-medium transition-colors flex justify-center items-center gap-2"
-                            >
-                                {isSubmitting ? 'İşleniyor...' : 'Planla'}
-                            </button>
-                        </form>
-                    </div>
-
-                    {/* Selected Day List */}
-                    <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
-                        <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-4 text-sm uppercase tracking-wider flex justify-between items-center">
-                            <span>Planlananlar</span>
-                            <span className="text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-2 py-1 rounded-full">{selectedDayEvents.length}</span>
+                        <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-100 dark:border-slate-700 pb-2">
+                            {date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
                         </h3>
 
-                        {selectedDayEvents.length === 0 ? (
-                            <p className="text-slate-400 text-sm text-center py-4">Planlanmış ödeme yok.</p>
+                        {(eventsForDate.length === 0 && subsForDate.length === 0) ? (
+                            <p className="text-slate-400 text-sm text-center py-6">Bu tarih için planlanmış bir ödeme yok.</p>
                         ) : (
                             <div className="space-y-3">
-                                {selectedDayEvents.map(txn => (
-                                    <div key={txn.id} className={`p-3 rounded-xl border ${txn.isCompleted ? 'border-emerald-100 bg-emerald-50/30 dark:border-emerald-900/30' : 'border-slate-100 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-700/30'}`}>
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div>
-                                                <p className={`font-semibold ${txn.isCompleted ? 'text-emerald-700 dark:text-emerald-400 line-through' : 'text-slate-800 dark:text-slate-200'}`}>{txn.title}</p>
-                                                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-1">
-                                                    <span>{txn.category}</span>
-                                                    <span>•</span>
-                                                    <span>{txn.amount} TL</span>
-                                                    <span>•</span>
-                                                    <span className={`flex items-center gap-1 ${txn.paymentMethod === 'credit_card' ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                                                        {txn.paymentMethod === 'credit_card' ? <CreditCard size={10} /> : <Banknote size={10} />}
-                                                        {txn.paymentMethod === 'credit_card' ? 'K.Kartı' : 'Nakit'}
-                                                    </span>
-                                                </div>
+                                {/* Subscriptions List */}
+                                {subsForDate.map(sub => (
+                                    <div key={sub.id} className="p-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/50 rounded-xl flex items-center justify-between group">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-sm" style={{ backgroundColor: sub.color || '#6366f1' }}>
+                                                {sub.name.charAt(0)}
                                             </div>
-                                            {!txn.isCompleted && (
-                                                <button
-                                                    onClick={() => handleComplete(txn)}
-                                                    className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 p-1"
-                                                    title="Ödendi İşaretle (Harcamalara Ekle)"
-                                                >
-                                                    <CheckCircle size={18} />
-                                                </button>
-                                            )}
+                                            <div>
+                                                <p className="font-semibold text-slate-800 dark:text-slate-100 text-sm">{sub.name}</p>
+                                                <span className="text-[10px] uppercase font-bold text-indigo-500 bg-indigo-100 dark:bg-indigo-900 px-1.5 py-0.5 rounded">Abonelik</span>
+                                            </div>
                                         </div>
-                                        <div className="flex justify-end">
-                                            <button
-                                                onClick={() => handleDelete(txn.id)}
-                                                className="text-slate-300 hover:text-red-500 transition-colors text-xs flex items-center gap-1"
-                                            >
-                                                <Trash2 size={12} /> Sil
-                                            </button>
+                                        <span className="font-bold text-indigo-600 dark:text-indigo-400 text-sm">
+                                            {sub.price.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}
+                                        </span>
+                                    </div>
+                                ))}
+
+                                {/* Planned Transactions List */}
+                                {eventsForDate.map(evt => (
+                                    <div key={evt.id} className={`p-3 rounded-xl border flex items-center justify-between group transition-all ${evt.isCompleted ? 'bg-emerald-50 border-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-800' : 'bg-slate-50 border-slate-100 dark:bg-slate-700/50 dark:border-slate-600'}`}>
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-2 rounded-lg ${evt.isCompleted ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900 dark:text-emerald-400' : 'bg-white text-slate-500 dark:bg-slate-600 dark:text-slate-300'}`}>
+                                                {evt.isCompleted ? <CheckCircle size={16} /> : <Circle size={16} />}
+                                            </div>
+                                            <div>
+                                                <p className={`font-semibold text-sm ${evt.isCompleted ? 'text-emerald-800 dark:text-emerald-200 line-through' : 'text-slate-800 dark:text-slate-200'}`}>{evt.title}</p>
+                                                <p className="text-xs text-slate-400">{evt.category}</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            <span className={`font-bold text-sm ${evt.isCompleted ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-300'}`}>
+                                                {evt.amount}₺
+                                            </span>
+                                            {!evt.isCompleted && (
+                                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button onClick={() => handleComplete(evt)} className="p-1.5 text-emerald-500 hover:bg-emerald-100 rounded-md" title="Öde">
+                                                        <CheckCircle size={14} />
+                                                    </button>
+                                                    <button onClick={() => handleDelete(evt.id)} className="p-1.5 text-red-500 hover:bg-red-100 rounded-md" title="Sil">
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         )}
+                    </div>
+
+                    {/* Add New Form */}
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+                        <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-4 flex items-center gap-2">
+                            <Plus size={20} className="text-indigo-500" />
+                            Yeni Plan Ekle
+                        </h3>
+                        <form onSubmit={handleAddPlanned} className="space-y-4">
+                            <div>
+                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Başlık</label>
+                                <input
+                                    type="text"
+                                    required
+                                    className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-700 border-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-slate-200"
+                                    placeholder="Örn: Kira Ödemesi"
+                                    value={title}
+                                    onChange={e => setTitle(e.target.value)}
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Tutar</label>
+                                    <input
+                                        type="number"
+                                        required
+                                        min="0"
+                                        className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-700 border-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-slate-200"
+                                        placeholder="0.00"
+                                        value={amount}
+                                        onChange={e => setAmount(e.target.value)}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Kategori</label>
+                                    <select
+                                        className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-700 border-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-slate-200"
+                                        value={category}
+                                        onChange={e => setCategory(e.target.value)}
+                                    >
+                                        <option value="">Seçiniz</option>
+                                        {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Payment Method */}
+                            <div>
+                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Ödeme Yöntemi</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setPaymentMethod('cash')}
+                                        className={`py-2 px-3 rounded-lg flex items-center justify-center gap-2 text-sm font-medium transition-all ${paymentMethod === 'cash' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-slate-50 text-slate-500 border border-transparent'}`}
+                                    >
+                                        <Banknote size={16} /> Nakit
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setPaymentMethod('credit_card')}
+                                        className={`py-2 px-3 rounded-lg flex items-center justify-center gap-2 text-sm font-medium transition-all ${paymentMethod === 'credit_card' ? 'bg-amber-50 text-amber-600 border border-amber-200' : 'bg-slate-50 text-slate-500 border border-transparent'}`}
+                                    >
+                                        <CreditCard size={16} /> Kredi Kartı
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Tekrar</label>
+                                <select
+                                    className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-700 border-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-slate-200"
+                                    value={recurrence}
+                                    onChange={e => setRecurrence(e.target.value)}
+                                >
+                                    <option value="none">Tek Seferlik</option>
+                                    <option value="weekly">Haftalık</option>
+                                    <option value="monthly">Aylık</option>
+                                </select>
+                            </div>
+
+                            {recurrence !== 'none' && (
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Tekrar Sayısı</label>
+                                    <input
+                                        type="number"
+                                        min="2"
+                                        max="60"
+                                        className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-700 border-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-slate-200"
+                                        value={recurrenceCount}
+                                        onChange={e => setRecurrenceCount(e.target.value)}
+                                    />
+                                </div>
+                            )}
+
+                            <button
+                                type="submit"
+                                disabled={isSubmitting}
+                                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg hover:shadow-indigo-500/30 transition-all flex items-center justify-center gap-2"
+                            >
+                                {isSubmitting ? 'Ekleniyor...' : (
+                                    <>
+                                        <Plus size={18} />
+                                        Plana Ekle
+                                    </>
+                                )}
+                            </button>
+                        </form>
                     </div>
                 </div>
             </div>

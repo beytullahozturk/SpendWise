@@ -18,18 +18,25 @@ import { auth, db } from '../firebase';
 import { Plus, Trash2, LogOut, Wallet, TrendingUp, TrendingDown, Calendar, Tag, Moon, Sun, Filter, Target, Edit2, BarChart2, Download, CreditCard, Banknote, CheckCircle, Bell, ShoppingCart, Car, Home, Zap, Film, Heart, GraduationCap, ShoppingBag } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import TrendModal from '../components/TrendModal';
+import Modal from '../components/Modal';
 import { useNavigate } from 'react-router-dom';
+import logo from '../assets/logo.png';
 
 // Categories will be fetched from user settings
 
 
 const COLORS = ['#6366f1', '#ec4899', '#8b5cf6', '#14b8a6', '#f59e0b', '#ef4444', '#3b82f6', '#10b981', '#6b7280'];
 
-export default function Dashboard({ user }) {
+export default function Dashboard({ user, filterDate, setFilterDate }) {
     const navigate = useNavigate();
     const [transactions, setTransactions] = useState([]);
     const [filteredTransactions, setFilteredTransactions] = useState([]);
     const [showTrendModal, setShowTrendModal] = useState(false);
+
+    // Edit Modal State
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editingTx, setEditingTx] = useState(null);
+
     const [amount, setAmount] = useState('');
     const [title, setTitle] = useState('');
     const [type, setType] = useState('expense');
@@ -77,6 +84,56 @@ export default function Dashboard({ user }) {
             }));
             data.sort((a, b) => new Date(a.date) - new Date(b.date));
             setPlannedTxns(data);
+        });
+        return () => unsubscribe();
+    }, [user.uid]);
+
+    const [upcomingSubscriptions, setUpcomingSubscriptions] = useState([]);
+
+    // Fetch Upcoming Subscriptions
+    useEffect(() => {
+        const q = query(collection(db, 'subscriptions'), where('uid', '==', user.uid), where('status', '==', 'active'));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const subs = snapshot.docs.map(doc => doc.data());
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const upcoming = subs.filter(sub => {
+                const day = sub.billingDay;
+                const currentMonth = today.getMonth();
+                const currentYear = today.getFullYear();
+
+                let nextDate = new Date(currentYear, currentMonth, day);
+
+                // If day passed, check next month? 
+                // However, for "upcoming" alert, we usually want to see if it's arriving soon.
+                // If today is 25th and billing day is 2nd, next billing is next month.
+                if (today.getDate() > day) {
+                    nextDate.setMonth(currentMonth + 1);
+                }
+
+                // Diff in days
+                const diffTime = nextDate - today;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                // Alert if due within 3 days (Today, tomorrow, day after etc.)
+                return diffDays >= 0 && diffDays <= 3;
+            }).map(sub => {
+                // Return enriched object for display
+                const day = sub.billingDay;
+                const currentMonth = today.getMonth();
+                const currentYear = today.getFullYear();
+                let nextDate = new Date(currentYear, currentMonth, day);
+                if (today.getDate() > day) nextDate.setMonth(currentMonth + 1);
+
+                const diffTime = nextDate - today;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                return { ...sub, daysLeft: diffDays };
+            });
+
+            setUpcomingSubscriptions(upcoming);
         });
         return () => unsubscribe();
     }, [user.uid]);
@@ -132,13 +189,7 @@ export default function Dashboard({ user }) {
         return window.matchMedia('(prefers-color-scheme: dark)').matches;
     });
 
-    // Date Filter State use formatted string YYYY-MM
-    const [filterDate, setFilterDate] = useState(() => {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        return `${year}-${month}`;
-    });
+
 
     useEffect(() => {
         if (darkMode) {
@@ -231,7 +282,38 @@ export default function Dashboard({ user }) {
     };
 
     const handleDelete = async (id) => {
+        if (!confirm('Bu işlemi silmek istediğinize emin misiniz?')) return;
         await deleteDoc(doc(db, 'transactions', id));
+    };
+
+    const handleEditClick = (tx) => {
+        setEditingTx({
+            ...tx,
+            date: tx.date || (tx.createdAt?.toDate ? tx.createdAt.toDate().toISOString().split('T')[0] : new Date().toISOString().split('T')[0])
+        });
+        setIsEditModalOpen(true);
+    };
+
+    const handleUpdateTransaction = async (e) => {
+        e.preventDefault();
+        if (!editingTx) return;
+
+        try {
+            await updateDoc(doc(db, 'transactions', editingTx.id), {
+                title: editingTx.title,
+                amount: parseFloat(editingTx.amount),
+                type: editingTx.type,
+                category: editingTx.category,
+                date: editingTx.date,
+                paymentMethod: editingTx.paymentMethod || 'cash',
+                cardName: editingTx.paymentMethod === 'credit_card' ? editingTx.cardName : null
+            });
+            setIsEditModalOpen(false);
+            setEditingTx(null);
+        } catch (error) {
+            console.error("Error updating document: ", error);
+            alert("Güncelleme sırasında bir hata oluştu.");
+        }
     };
 
 
@@ -309,16 +391,14 @@ export default function Dashboard({ user }) {
                 */}
                 <div className="flex items-center gap-2 lg:hidden">
                     {/* Mobile Logo */}
-                    <div className="p-1.5 bg-indigo-600 rounded-lg text-white shadow-lg shadow-indigo-500/30">
-                        <Wallet size={20} />
-                    </div>
+                    <img src={logo} alt="SpendWise" className="w-8 h-8 rounded-lg shadow-lg shadow-indigo-500/30" />
                     <h1 className="text-xl font-bold text-indigo-700 dark:text-indigo-400">SpendWise</h1>
                 </div>
 
                 {/* Desktop Title (Optional) */}
                 <h2 className="hidden lg:block text-2xl font-bold text-slate-800 dark:text-slate-100">Genel Bakış</h2>
 
-                <div className="flex flex-wrap justify-center items-center gap-2 sm:gap-4 w-full md:w-auto">
+                <div className="flex flex-wrap justify-center sm:justify-end items-center gap-2 w-full md:w-auto">
                     {/* Export Button */}
                     <button
                         onClick={handleExport}
@@ -326,27 +406,28 @@ export default function Dashboard({ user }) {
                         title="CSV Olarak İndir"
                     >
                         <Download size={20} />
-                        <span className="hidden sm:inline font-medium">İndir</span>
+                        <span className="hidden sm:inline font-medium text-sm">İndir</span>
                     </button>
 
                     {/* Trend Button */}
                     <button
                         onClick={() => setShowTrendModal(true)}
                         className="p-2 bg-indigo-50 dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-slate-600 transition-colors flex items-center gap-2"
+                        title="Trendler"
                     >
                         <BarChart2 size={20} />
-                        <span className="hidden sm:inline font-medium">Trendler</span>
+                        <span className="hidden sm:inline font-medium text-sm">Trendler</span>
                     </button>
 
                     {/* Date Filter */}
-                    <div className="relative">
+                    <div className="relative flex-1 sm:flex-none min-w-[140px]">
                         <input
                             type="month"
-                            className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 pr-10 outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200 transition-all shadow-sm w-full sm:w-auto"
+                            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 pr-8 outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200 text-sm shadow-sm"
                             value={filterDate}
                             onChange={(e) => setFilterDate(e.target.value)}
                         />
-                        <Calendar className="absolute right-3 top-2.5 text-slate-400 pointer-events-none" size={18} />
+                        <Calendar className="absolute right-2.5 top-2.5 text-slate-400 pointer-events-none" size={16} />
                     </div>
 
                     {/* Notification Center */}
@@ -356,9 +437,9 @@ export default function Dashboard({ user }) {
                             className="relative p-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all shadow-sm"
                         >
                             <Bell size={20} />
-                            {plannedTxns.length > 0 && (
+                            {(plannedTxns.length + upcomingSubscriptions.length) > 0 && (
                                 <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-pulse">
-                                    {plannedTxns.length}
+                                    {plannedTxns.length + upcomingSubscriptions.length}
                                 </span>
                             )}
                         </button>
@@ -371,73 +452,105 @@ export default function Dashboard({ user }) {
                                     <button onClick={() => navigate('/calendar')} className="text-xs text-indigo-600 dark:text-indigo-400 font-medium hover:underline">Takvime Git</button>
                                 </div>
                                 <div className="max-h-[360px] overflow-y-auto p-2 space-y-4">
-                                    {plannedTxns.length === 0 ? (
+                                    {(plannedTxns.length === 0 && upcomingSubscriptions.length === 0) ? (
                                         <div className="p-8 text-center text-slate-400 text-sm">
                                             <Bell className="mx-auto mb-2 opacity-50" size={24} />
-                                            <p>Harika! Planlanmış ödemeniz yok.</p>
+                                            <p>Harika! Planlanmış ödemeniz veya yaklaşan aboneliğiniz yok.</p>
                                         </div>
                                     ) : (
-                                        (() => {
-                                            const today = new Date();
-                                            today.setHours(0, 0, 0, 0);
-
-                                            const groups = plannedTxns.reduce((acc, txn) => {
-                                                const txnDate = new Date(txn.date);
-                                                txnDate.setHours(0, 0, 0, 0);
-                                                const diffDays = Math.ceil((txnDate - today) / (1000 * 60 * 60 * 24));
-
-                                                if (diffDays < 0) acc.overdue.push(txn);
-                                                else if (diffDays <= 1) acc.upcoming.push(txn);
-                                                else acc.future.push(txn);
-                                                return acc;
-                                            }, { overdue: [], upcoming: [], future: [] });
-
-                                            const renderGroup = (title, items, titleColor) => (
-                                                items.length > 0 && (
-                                                    <div className="space-y-1">
-                                                        <h4 className={`text-[10px] uppercase font-bold tracking-wider px-2 ${titleColor}`}>{title}</h4>
-                                                        {items.map(txn => (
-                                                            <div key={txn.id} className="p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 border-b border-slate-50 dark:border-slate-700/50 last:border-0 transition-colors flex justify-between items-center group">
-                                                                <div className="min-w-0 flex-1 pr-3">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className="p-1 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
-                                                                            {getCategoryIcon(txn.category)}
-                                                                        </span>
-                                                                        <p className="font-medium text-slate-800 dark:text-slate-200 text-sm truncate">{txn.title}</p>
-                                                                    </div>
-                                                                    <div className="flex items-center gap-2 text-xs text-slate-500 mt-1 pl-7">
-                                                                        <span>{new Date(txn.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}</span>
-                                                                        <span className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-400">
-                                                                            {getDaysRemaining(txn.date)}
-                                                                        </span>
-                                                                    </div>
+                                        <>
+                                            {/* Subscriptions Alert */}
+                                            {upcomingSubscriptions.length > 0 && (
+                                                <div className="space-y-2 mb-2">
+                                                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider pl-1">Yaklaşan Abonelikler ({upcomingSubscriptions.length})</h4>
+                                                    {upcomingSubscriptions.map(sub => (
+                                                        <div key={sub.id} className="p-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/50 flex justify-between items-center group">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-sm" style={{ backgroundColor: sub.color || '#6366f1' }}>
+                                                                    {sub.name.charAt(0)}
                                                                 </div>
-
-                                                                <div className="flex items-center gap-3">
-                                                                    <span className="font-bold text-slate-700 dark:text-slate-300 text-sm">{txn.amount.toLocaleString('tr-TR')} ₺</span>
-
-                                                                    <button
-                                                                        onClick={() => handleCompletePlanned(txn)}
-                                                                        className="p-1.5 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-full transition-all"
-                                                                        title="Ödendi Olarak İşaretle"
-                                                                    >
-                                                                        <CheckCircle size={18} />
-                                                                    </button>
+                                                                <div>
+                                                                    <p className="font-semibold text-slate-800 dark:text-slate-200 text-sm">{sub.name}</p>
+                                                                    <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                                                                        <Calendar size={10} />
+                                                                        {sub.daysLeft === 0 ? 'Bugün!' : sub.daysLeft === 1 ? 'Yarın' : `${sub.daysLeft} gün kaldı`}
+                                                                    </p>
                                                                 </div>
                                                             </div>
-                                                        ))}
-                                                    </div>
-                                                )
-                                            );
+                                                            <div className="text-right">
+                                                                <span className="font-bold text-indigo-600 dark:text-indigo-400 text-sm">
+                                                                    {sub.price.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} ₺
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                    <div className="border-b border-slate-100 dark:border-slate-700 my-2"></div>
+                                                </div>
+                                            )}
 
-                                            return (
-                                                <>
-                                                    {renderGroup('Gecikenler', groups.overdue, 'text-red-500')}
-                                                    {renderGroup('Yaklaşanlar', groups.upcoming, 'text-amber-500')}
-                                                    {renderGroup('Gelecek Planlar', groups.future, 'text-emerald-500')}
-                                                </>
-                                            );
-                                        })()
+                                            {(() => {
+                                                const today = new Date();
+                                                // ... (rest of planned transactions logic continues below)
+                                                today.setHours(0, 0, 0, 0);
+
+                                                const groups = plannedTxns.reduce((acc, txn) => {
+                                                    const txnDate = new Date(txn.date);
+                                                    txnDate.setHours(0, 0, 0, 0);
+                                                    const diffDays = Math.ceil((txnDate - today) / (1000 * 60 * 60 * 24));
+
+                                                    if (diffDays < 0) acc.overdue.push(txn);
+                                                    else if (diffDays <= 1) acc.upcoming.push(txn);
+                                                    else acc.future.push(txn);
+                                                    return acc;
+                                                }, { overdue: [], upcoming: [], future: [] });
+
+                                                const renderGroup = (title, items, titleColor) => (
+                                                    items.length > 0 && (
+                                                        <div className="space-y-1">
+                                                            <h4 className={`text-[10px] uppercase font-bold tracking-wider px-2 ${titleColor}`}>{title}</h4>
+                                                            {items.map(txn => (
+                                                                <div key={txn.id} className="p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 border-b border-slate-50 dark:border-slate-700/50 last:border-0 transition-colors flex justify-between items-center group">
+                                                                    <div className="min-w-0 flex-1 pr-3">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span className="p-1 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+                                                                                {getCategoryIcon(txn.category)}
+                                                                            </span>
+                                                                            <p className="font-medium text-slate-800 dark:text-slate-200 text-sm truncate">{txn.title}</p>
+                                                                        </div>
+                                                                        <div className="flex items-center gap-2 text-xs text-slate-500 mt-1 pl-7">
+                                                                            <span>{new Date(txn.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}</span>
+                                                                            <span className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-400">
+                                                                                {getDaysRemaining(txn.date)}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="flex items-center gap-3">
+                                                                        <span className="font-bold text-slate-700 dark:text-slate-300 text-sm">{txn.amount.toLocaleString('tr-TR')} ₺</span>
+
+                                                                        <button
+                                                                            onClick={() => handleCompletePlanned(txn)}
+                                                                            className="p-1.5 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-full transition-all"
+                                                                            title="Ödendi Olarak İşaretle"
+                                                                        >
+                                                                            <CheckCircle size={18} />
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )
+                                                );
+
+                                                return (
+                                                    <>
+                                                        {renderGroup('Gecikenler', groups.overdue, 'text-red-500')}
+                                                        {renderGroup('Yaklaşanlar', groups.upcoming, 'text-amber-500')}
+                                                        {renderGroup('Gelecek Planlar', groups.future, 'text-emerald-500')}
+                                                    </>
+                                                );
+                                            })()}
+                                        </>
                                     )}
                                 </div>
 
@@ -783,13 +896,23 @@ export default function Dashboard({ user }) {
                                             <span className={`font-bold text-sm sm:text-lg whitespace-nowrap ${t.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'}`}>
                                                 {t.type === 'income' ? '+' : '-'}{Math.abs(t.amount).toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}
                                             </span>
-                                            <button
-                                                onClick={() => handleDelete(t.id)}
-                                                className="p-2 text-slate-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
-                                                title="Sil"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
+
+                                            <div className="flex gap-1">
+                                                <button
+                                                    onClick={() => handleEditClick(t)}
+                                                    className="p-2 text-slate-300 dark:text-slate-600 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                                                    title="Düzenle"
+                                                >
+                                                    <Edit2 size={18} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(t.id)}
+                                                    className="p-2 text-slate-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                                                    title="Sil"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
@@ -798,6 +921,123 @@ export default function Dashboard({ user }) {
                     </div>
                 </div>
             </div>
+            {/* Edit Modal */}
+            {editingTx && (
+                <Modal
+                    isOpen={isEditModalOpen}
+                    onClose={() => setIsEditModalOpen(false)}
+                    title="İşlemi Düzenle"
+                >
+                    <form onSubmit={handleUpdateTransaction} className="space-y-4">
+                        <div className="grid grid-cols-2 gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setEditingTx({ ...editingTx, type: 'expense' })}
+                                className={`py-2 px-4 rounded-lg font-medium transition-all ${editingTx.type === 'expense' ? 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 border' : 'bg-slate-50 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}
+                            >
+                                Gider
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setEditingTx({ ...editingTx, type: 'income' })}
+                                className={`py-2 px-4 rounded-lg font-medium transition-all ${editingTx.type === 'income' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 border' : 'bg-slate-50 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}
+                            >
+                                Gelir
+                            </button>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tarih</label>
+                            <input
+                                type="date"
+                                required
+                                className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                value={editingTx.date}
+                                onChange={(e) => setEditingTx({ ...editingTx, date: e.target.value })}
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Kategori</label>
+                            <select
+                                className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                value={editingTx.category}
+                                onChange={(e) => setEditingTx({ ...editingTx, category: e.target.value })}
+                            >
+                                {(editingTx.type === 'expense' ? expenseCategories : incomeCategories).map(c => (
+                                    <option key={c} value={c}>{c}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Açıklama</label>
+                            <input
+                                type="text"
+                                required
+                                className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                value={editingTx.title}
+                                onChange={(e) => setEditingTx({ ...editingTx, title: e.target.value })}
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Miktar</label>
+                            <input
+                                type="number"
+                                required
+                                min="0"
+                                step="0.01"
+                                className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                value={editingTx.amount}
+                                onChange={(e) => setEditingTx({ ...editingTx, amount: e.target.value })}
+                            />
+                        </div>
+
+                        {editingTx.type === 'expense' && (
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Ödeme Yöntemi</label>
+                                <div className="grid grid-cols-2 gap-2 mb-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditingTx({ ...editingTx, paymentMethod: 'cash', cardName: null })}
+                                        className={`py-2 text-sm rounded-lg border ${editingTx.paymentMethod === 'cash' ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 text-emerald-600' : 'border-slate-200 dark:border-slate-700'}`}
+                                    >
+                                        Nakit
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditingTx({ ...editingTx, paymentMethod: 'credit_card', cardName: creditCards[0] || '' })}
+                                        className={`py-2 text-sm rounded-lg border ${editingTx.paymentMethod === 'credit_card' ? 'bg-amber-50 dark:bg-amber-900/30 border-amber-200 text-amber-600' : 'border-slate-200 dark:border-slate-700'}`}
+                                    >
+                                        Kredi Kartı
+                                    </button>
+                                </div>
+
+                                {editingTx.paymentMethod === 'credit_card' && (
+                                    <select
+                                        className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200"
+                                        value={editingTx.cardName || ''}
+                                        onChange={(e) => setEditingTx({ ...editingTx, cardName: e.target.value })}
+                                    >
+                                        <option value="" disabled>Kart Seçin</option>
+                                        {creditCards.map(c => (
+                                            <option key={c} value={c}>{c}</option>
+                                        ))}
+                                    </select>
+                                )}
+                            </div>
+                        )}
+
+                        <button
+                            type="submit"
+                            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-lg transition-all"
+                        >
+                            Güncelle
+                        </button>
+                    </form>
+                </Modal>
+            )}
         </div>
     );
 }

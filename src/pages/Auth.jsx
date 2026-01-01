@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import {
     createUserWithEmailAndPassword,
-    signInWithEmailAndPassword
+    signInWithEmailAndPassword,
+    sendEmailVerification
 } from 'firebase/auth';
 import { auth } from '../firebase';
 
@@ -18,7 +19,8 @@ export default function Auth() {
             if (isLogin) {
                 await signInWithEmailAndPassword(auth, email, password);
             } else {
-                await createUserWithEmailAndPassword(auth, email, password);
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                await sendEmailVerification(userCredential.user);
             }
         } catch (err) {
             setError(err.message);
