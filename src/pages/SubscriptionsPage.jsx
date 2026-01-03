@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, setDoc, deleteDoc, addDoc, getDocs, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Zap, Plus, Trash2, Calendar, CreditCard, CheckCircle, AlertCircle, Edit2, Play, Pause } from 'lucide-react';
 import Modal from '../components/Modal';
+import ConfirmModal from '../components/ConfirmModal';
 
 // Predefined subscription services with clearer colors and icons
 const POPULAR_SUBSCRIPTIONS = [
@@ -23,6 +24,7 @@ export default function SubscriptionsPage({ user }) {
     const [subscriptions, setSubscriptions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [confirmModal, setConfirmModal] = useState({ isOpen: false, sub: null });
 
     // Form State
     const [formData, setFormData] = useState({
@@ -103,6 +105,59 @@ export default function SubscriptionsPage({ user }) {
     const openEdit = (sub) => {
         setFormData({ ...sub });
         setIsModalOpen(true);
+    };
+
+    const handlePayClick = async (sub) => {
+        // Mükerrer ödeme kontrolü
+        try {
+            const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+            const titleToCheck = `${sub.name} Aboneliği`;
+
+            const q = query(
+                collection(db, 'transactions'),
+                where('uid', '==', user.uid),
+                where('title', '==', titleToCheck)
+            );
+
+            const snapshot = await getDocs(q);
+            const alreadyPaid = snapshot.docs.some(doc => {
+                const data = doc.data();
+                return data.date && data.date.startsWith(currentMonth);
+            });
+
+            if (alreadyPaid) {
+                alert(`"${sub.name}" için bu ay zaten bir harcama kaydı bulunuyor.`);
+                return;
+            }
+
+            setConfirmModal({ isOpen: true, sub });
+        } catch (error) {
+            console.error("Ödeme kontrolü hatası:", error);
+            alert("Bir hata oluştu, lütfen tekrar deneyin.");
+        }
+    };
+
+    const handleExecutePayment = async () => {
+        const sub = confirmModal.sub;
+        if (!sub) return;
+
+        try {
+            await addDoc(collection(db, 'transactions'), {
+                uid: user.uid,
+                title: `${sub.name} Aboneliği`,
+                amount: sub.price,
+                type: 'expense',
+                category: 'Fatura',
+                paymentMethod: 'credit_card',
+                date: new Date().toISOString().split('T')[0],
+                subscriptionId: sub.id, // ID referansı
+                createdAt: serverTimestamp()
+            });
+            alert('Harcama başarıyla eklendi!');
+        } catch (error) {
+            console.error(error);
+            alert('Hata oluştu.');
+        }
     };
 
     // Stats
@@ -211,12 +266,22 @@ export default function SubscriptionsPage({ user }) {
                                             <span className="text-xs text-slate-500 dark:text-slate-400">{sub.billingDay}. Gün / {sub.cycle === 'monthly' ? 'Aylık' : 'Yıllık'}</span>
                                         </div>
                                     </div>
-                                    <button
-                                        onClick={() => openEdit(sub)}
-                                        className="text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
-                                    >
-                                        <Edit2 size={18} />
-                                    </button>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => handlePayClick(sub)}
+                                            className="text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                                            title="Ödemeyi Harcama Olarak Ekle"
+                                        >
+                                            <CreditCard size={18} />
+                                        </button>
+                                        <button
+                                            onClick={() => openEdit(sub)}
+                                            className="text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                                            title="Düzenle"
+                                        >
+                                            <Edit2 size={18} />
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className="flex items-end justify-between">
@@ -350,6 +415,15 @@ export default function SubscriptionsPage({ user }) {
                     </div>
                 </form>
             </Modal>
-        </div>
+
+            <ConfirmModal
+                isOpen={confirmModal.isOpen}
+                onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+                onConfirm={handleExecutePayment}
+                title="Abonelik Ödemesi"
+                message={`"${confirmModal.sub?.name}" için ${confirmModal.sub?.price} TL tutarında harcama eklemek istiyor musunuz?`}
+                type="info"
+            />
+        </div >
     );
 }

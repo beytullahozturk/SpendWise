@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Toaster } from 'react-hot-toast';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
@@ -38,6 +39,7 @@ function App() {
     return (
         <BrowserRouter>
             <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans selection:bg-indigo-100 dark:selection:bg-indigo-900 transition-colors duration-300">
+                <Toaster position="top-right" toastOptions={{ duration: 3000, style: { background: '#333', color: '#fff' }, className: 'dark:bg-slate-800 dark:text-white' }} />
                 {!user ? (
                     <Auth />
                 ) : !user.emailVerified ? (

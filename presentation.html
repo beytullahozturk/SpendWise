@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <title>SpendWise - Proje Sunumu</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.0.4/reset.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.0.4/reveal.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.0.4/theme/white.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Custom Theme Overrides matching SpendWise -->
+    <style>
+        :root {
+            --spendwise-primary: #4f46e5;
+            /* Indigo 600 */
+            --spendwise-secondary: #818cf8;
+            /* Indigo 400 */
+            --spendwise-dark: #312e81;
+            /* Indigo 900 */
+        }
+
+        .reveal {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+
+        .reveal h1,
+        .reveal h2,
+        .reveal h3 {
+            color: var(--spendwise-dark);
+            font-family: 'Inter', sans-serif;
+        }
+
+        .reveal h1 {
+            text-transform: none;
+            font-weight: 800;
+        }
+
+        .reveal .accent {
+            color: var(--spendwise-primary);
+        }
+
+        .slide-logo {
+            width: 80px;
+            height: 80px;
+            box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.4);
+            border-radius: 16px;
+            margin-bottom: 20px !important;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            text-align: center;
+        }
+
+        .feature-item {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .feature-icon {
+            font-size: 2.5rem;
+            color: var(--spendwise-primary);
+            margin-bottom: 15px;
+        }
+
+        .tech-stack {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 40px;
+        }
+
+        .tech-badge {
+            display: flex;
+            flex-col;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .tech-badge i {
+            font-size: 3rem;
+            color: #333;
+        }
+
+        .screenshot-placeholder {
+            width: 80%;
+            height: 400px;
+            margin: 0 auto;
+            background: linear-gradient(to bottom right, #ffffff, #f3f4f6);
+            border: 2px dashed #cbd5e1;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+            font-family: monospace;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="reveal">
+        <div class="slides">
+
+            <!-- Slide 1: Giriş -->
+            <section>
+                <img src="./public/favicon.png" class="slide-logo" alt="Logo">
+                <h1>Spend<span class="accent">Wise</span></h1>
+                <h3>Kişisel Gelir/Gider Takip Asistanı</h3>
+                <p>
+                    <small>Modern, Hızlı ve Akıllı Finans Yönetimi</small>
+                </p>
+                <p style="font-size: 0.6em; margin-top: 50px;">Geliştirici: Beytullah Öztürk & Antigravity</p>
+            </section>
+
+            <!-- Slide 2: Proje Özeti -->
+            <section>
+                <h2>🎯 Projenin Amacı</h2>
+                <p>Kullanıcıların finansal farkındalığını artırmak ve varlık yönetimini tek bir merkezden yapmalarını
+                    sağlamak.</p>
+                <br>
+                <ul style="font-size: 0.8em;">
+                    <li>✅ Tüm gelir ve giderlerin tek yerden takibi</li>
+                    <li>✅ Kredi kartı ve bütçe yönetimi</li>
+                    <li>✅ Yatırım portföyü ve anlık piyasa takibi</li>
+                    <li>✅ Abonelik yönetimi ve hatırlatmalar</li>
+                </ul>
+            </section>
+
+            <!-- Slide 3: Teknoloji Yığını -->
+            <section>
+                <h2>🛠️ Teknoloji Yığını</h2>
+                <div class="tech-stack">
+                    <div class="tech-badge"><i class="fab fa-react" style="color: #61DAFB;"></i><span>React</span></div>
+                    <div class="tech-badge"><i class="fab fa-google" style="color: #FFCA28;"></i><span>Firebase</span>
+                    </div>
+                    <div class="tech-badge"><i class="fas fa-wind" style="color: #38BDF8;"></i><span>Tailwind</span>
+                    </div>
+                    <div class="tech-badge"><i class="fas fa-bolt" style="color: #FFC107;"></i><span>Vite</span></div>
+                    <div class="tech-badge"><i class="fas fa-chart-pie"
+                            style="color: #F87171;"></i><span>Recharts</span></div>
+                </div>
+            </section>
+
+            <!-- Slide 4: Dashboard Görünümü (Mockup) -->
+            <section>
+                <h2>🏠 Dashboard & Arayüz</h2>
+                <p style="font-size: 0.6em;">Kullanıcı dostu, responsive ve karanlık mod destekli arayüz.</p>
+                <!-- Kullanıcı buraya gerçek ekran görüntüsü ekleyebilir -->
+                <div style="display: flex; justify-content: center;">
+                    <img src="./public/presentation/dashboard_mockup.png" alt="Dashboard"
+                        style="border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); max-height: 500px;">
+                </div>
+            </section>
+
+            <!-- Slide 5: Modüller -->
+            <section>
+                <h2>📦 Modüller</h2>
+                <div class="feature-grid" style="font-size: 0.6em;">
+                    <div class="feature-item">
+                        <i class="feature-icon fas fa-wallet"></i>
+                        <h4>Cüzdan</h4>
+                        <p>Gelir/Gider takibi</p>
+                    </div>
+                    <div class="feature-item">
+                        <i class="feature-icon fas fa-landmark"></i>
+                        <h4>Portföy</h4>
+                        <p>Altın/Döviz/Kripto</p>
+                    </div>
+                    <div class="feature-item">
+                        <i class="feature-icon fas fa-bolt"></i>
+                        <h4>Abonelikler</h4>
+                        <p>Otomatik takipler</p>
+                    </div>
+                    <div class="feature-item">
+                        <i class="feature-icon fas fa-calendar-alt"></i>
+                        <h4>Takvim</h4>
+                        <p>Planlı ödemeler</p>
+                    </div>
+                    <div class="feature-item">
+                        <i class="feature-icon fas fa-chart-line"></i>
+                        <h4>Raporlar</h4>
+                        <p>Detaylı analizler</p>
+                    </div>
+                    <div class="feature-item">
+                        <i class="feature-icon fas fa-credit-card"></i>
+                        <h4>Kartlar</h4>
+                        <p>Kredi kartı yönetimi</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 6: Gelecek Planları -->
+            <section>
+                <h2>🚀 Gelecek Planları</h2>
+                <div style="text-align: left; margin-left: 10%;">
+                    <p><i class="fas fa-check-circle accent"></i> v1.1.0 Yayında (Şu an)</p>
+                    <p style="opacity: 0.7;"><i class="far fa-circle"></i> Çoklu Dil Desteği (EN/DE)</p>
+                    <p style="opacity: 0.7;"><i class="far fa-circle"></i> Açık Bankacılık API Entegrasyonu</p>
+                    <p style="opacity: 0.7;"><i class="far fa-circle"></i> AI Tabanlı Yatırım Tavsiyeleri</p>
+                </div>
+            </section>
+
+            <!-- Slide 7: Kapanış -->
+            <section>
+                <h1>Teşekkürler</h1>
+                <p>SpendWise ile finansal özgürlük!</p>
+                <br>
+                <p><a href="https://beytullahozturk.github.io/SpendWise/"
+                        target="_blank">beytullahozturk.github.io/SpendWise</a></p>
+            </section>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.0.4/reveal.min.js"></script>
+    <script>
+        Reveal.initialize({
+            hash: true,
+            controls: true,
+            progress: true,
+            center: true,
+        });
+    </script>
+</body>
+
+</html>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import {
-    signOut
-} from 'firebase/auth';
+import { signOut } from 'firebase/auth';
+import SmartInsights from '../components/SmartInsights';
+
 import {
     collection,
     addDoc,
@@ -398,32 +398,32 @@ export default function Dashboard({ user, filterDate, setFilterDate }) {
                 {/* Desktop Title (Optional) */}
                 <h2 className="hidden lg:block text-2xl font-bold text-slate-800 dark:text-slate-100">Genel Bakış</h2>
 
-                <div className="flex flex-wrap justify-center sm:justify-end items-center gap-2 w-full md:w-auto">
+                <div className="grid grid-cols-5 gap-2 w-full md:flex md:w-auto md:items-center">
                     {/* Export Button */}
                     <button
                         onClick={handleExport}
-                        className="p-2 bg-indigo-50 dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-slate-600 transition-colors flex items-center gap-2"
+                        className="col-span-1 p-2 bg-indigo-50 dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-slate-600 transition-colors flex items-center justify-center gap-2 group md:order-1"
                         title="CSV Olarak İndir"
                     >
                         <Download size={20} />
-                        <span className="hidden sm:inline font-medium text-sm">İndir</span>
+                        <span className="hidden lg:inline font-medium text-sm group-hover:text-indigo-700 dark:group-hover:text-indigo-300">İndir</span>
                     </button>
 
                     {/* Trend Button */}
                     <button
                         onClick={() => setShowTrendModal(true)}
-                        className="p-2 bg-indigo-50 dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-slate-600 transition-colors flex items-center gap-2"
+                        className="col-span-1 p-2 bg-indigo-50 dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-slate-600 transition-colors flex items-center justify-center gap-2 group md:order-2"
                         title="Trendler"
                     >
                         <BarChart2 size={20} />
-                        <span className="hidden sm:inline font-medium text-sm">Trendler</span>
+                        <span className="hidden lg:inline font-medium text-sm group-hover:text-indigo-700 dark:group-hover:text-indigo-300">Trendler</span>
                     </button>
 
-                    {/* Date Filter */}
-                    <div className="relative flex-1 sm:flex-none min-w-[140px]">
+                    {/* Date Filter - Mobile Top Row (Order First), Desktop Middle (Order 3) */}
+                    <div className="col-span-5 order-first md:order-3 relative md:mx-2 md:w-auto">
                         <input
                             type="month"
-                            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 pr-8 outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200 text-sm shadow-sm"
+                            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 pr-8 outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-200 text-sm shadow-sm transition-colors"
                             value={filterDate}
                             onChange={(e) => setFilterDate(e.target.value)}
                         />
@@ -431,10 +431,10 @@ export default function Dashboard({ user, filterDate, setFilterDate }) {
                     </div>
 
                     {/* Notification Center */}
-                    <div className="relative">
+                    <div className="col-span-1 relative flex justify-center md:block md:order-4">
                         <button
                             onClick={() => setShowNotifications(!showNotifications)}
-                            className="relative p-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all shadow-sm"
+                            className="relative p-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all shadow-sm w-full flex justify-center"
                         >
                             <Bell size={20} />
                             {(plannedTxns.length + upcomingSubscriptions.length) > 0 && (
@@ -446,7 +446,7 @@ export default function Dashboard({ user, filterDate, setFilterDate }) {
 
                         {/* Dropdown */}
                         {showNotifications && (
-                            <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-100 dark:border-slate-700 overflow-hidden z-50">
+                            <div className="absolute right-0 sm:-right-12 md:right-0 top-full mt-2 w-72 sm:w-96 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-100 dark:border-slate-700 overflow-hidden z-50">
                                 <div className="p-3 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/20">
                                     <h3 className="font-semibold text-slate-800 dark:text-slate-200 text-sm">Finansal Asistan</h3>
                                     <button onClick={() => navigate('/calendar')} className="text-xs text-indigo-600 dark:text-indigo-400 font-medium hover:underline">Takvime Git</button>
@@ -569,7 +569,7 @@ export default function Dashboard({ user, filterDate, setFilterDate }) {
                     {/* Dark Mode Toggle */}
                     <button
                         onClick={() => setDarkMode(!darkMode)}
-                        className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                        className="col-span-1 p-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex justify-center w-full md:order-5"
                     >
                         {darkMode ? <Sun size={20} /> : <Moon size={20} />}
                     </button>
@@ -577,7 +577,7 @@ export default function Dashboard({ user, filterDate, setFilterDate }) {
                     {/* Logout */}
                     <button
                         onClick={() => signOut(auth)}
-                        className="p-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
+                        className="col-span-1 p-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors flex justify-center w-full md:order-6"
                         title="Çıkış Yap"
                     >
                         <LogOut size={20} />
@@ -593,6 +593,9 @@ export default function Dashboard({ user, filterDate, setFilterDate }) {
                     darkMode={darkMode}
                 />
             )}
+
+            {/* Smart Insights (Finansal Asistan) */}
+            <SmartInsights user={user} transactions={transactions} />
 
             {/* Content Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

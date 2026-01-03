@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
+import SmartReportAnalysis from '../components/SmartReportAnalysis';
+
+
 import {
     LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
     AreaChart, Area, PieChart, Pie, Cell
 } from 'recharts';
 import { Calendar, Filter, Download, TrendingUp, TrendingDown, DollarSign, Activity, CreditCard } from 'lucide-react';
 
-const COLORS = ['#6366f1', '#ec4899', '#8b5cf6', '#14b8a6', '#f59e0b', '#ef4444', '#3b82f6', '#10b981', '#6b7280'];
+const COLORS = ['#6366f1', '#ec4899', '#8b5cf6', '#19d6c0ff', '#f59e0b', '#ef4444', '#3b82f6', '#10b981', '#6b7280'];
 
 export default function ReportsPage({ user }) {
     const [transactions, setTransactions] = useState([]);
