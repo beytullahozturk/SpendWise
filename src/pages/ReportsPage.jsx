@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import SmartReportAnalysis from '../components/SmartReportAnalysis';
 
@@ -16,6 +16,18 @@ export default function ReportsPage({ user }) {
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [timeRange, setTimeRange] = useState('6M'); // 1M, 3M, 6M, 1Y, ALL
+    const [currency, setCurrency] = useState('TRY');
+
+    // Fetch Settings
+    useEffect(() => {
+        const unsub = onSnapshot(doc(db, 'user_settings', user.uid), (doc) => {
+            if (doc.exists()) {
+                const data = doc.data();
+                if (data.currency) setCurrency(data.currency);
+            }
+        });
+        return () => unsub();
+    }, [user.uid]);
 
     // Veri Çekme
     useEffect(() => {
@@ -160,7 +172,7 @@ export default function ReportsPage({ user }) {
                                 {entry.name === 'income' ? 'Gelir' : entry.name === 'expense' ? 'Gider' : entry.name}:
                             </span>
                             <span className="font-mono font-medium text-slate-700 dark:text-slate-200">
-                                {entry.value.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}
+                                {entry.value.toLocaleString('tr-TR', { style: 'currency', currency })}
                             </span>
                         </div>
                     ))}
@@ -196,20 +208,22 @@ export default function ReportsPage({ user }) {
                 </div>
             </div>
 
+            <SmartReportAnalysis transactions={transactions} timeRange={timeRange} currency={currency} />
+
             {/* Özet Kartları */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                 <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Toplam Gelir</p>
-                    <h3 className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{summary.totalIncome.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 })}</h3>
+                    <h3 className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{summary.totalIncome.toLocaleString('tr-TR', { style: 'currency', currency, maximumFractionDigits: 0 })}</h3>
                 </div>
                 <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Toplam Gider</p>
-                    <h3 className="text-2xl font-bold text-red-600 dark:text-red-400">{summary.totalExpense.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 })}</h3>
+                    <h3 className="text-2xl font-bold text-red-600 dark:text-red-400">{summary.totalExpense.toLocaleString('tr-TR', { style: 'currency', currency, maximumFractionDigits: 0 })}</h3>
                 </div>
                 <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Net Durum</p>
                     <h3 className={`text-2xl font-bold ${summary.net >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-red-500'}`}>
-                        {summary.net > 0 ? '+' : ''}{summary.net.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 })}
+                        {summary.net > 0 ? '+' : ''}{summary.net.toLocaleString('tr-TR', { style: 'currency', currency, maximumFractionDigits: 0 })}
                     </h3>
                 </div>
                 <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
@@ -335,7 +349,7 @@ export default function ReportsPage({ user }) {
                                     </div>
                                 </div>
                                 <span className="font-bold text-slate-700 dark:text-slate-300">
-                                    {card.value.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}
+                                    {card.value.toLocaleString('tr-TR', { style: 'currency', currency })}
                                 </span>
                             </div>
                         ))}

@@ -37,7 +37,7 @@ function App() {
     if (loading) return <div className="min-h-screen grid place-items-center bg-slate-50 text-slate-500">Yükleniyor...</div>;
 
     return (
-        <BrowserRouter>
+        <BrowserRouter basename={import.meta.env.BASE_URL}>
             <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans selection:bg-indigo-100 dark:selection:bg-indigo-900 transition-colors duration-300">
                 <Toaster position="top-right" toastOptions={{ duration: 3000, style: { background: '#333', color: '#fff' }, className: 'dark:bg-slate-800 dark:text-white' }} />
                 {!user ? (

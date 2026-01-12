@@ -15,7 +15,7 @@ import {
     serverTimestamp
 } from 'firebase/firestore';
 import { auth, db } from '../firebase';
-import { Plus, Trash2, LogOut, Wallet, TrendingUp, TrendingDown, Calendar, Tag, Moon, Sun, Filter, Target, Edit2, BarChart2, Download, CreditCard, Banknote, CheckCircle, Bell, ShoppingCart, Car, Home, Zap, Film, Heart, GraduationCap, ShoppingBag } from 'lucide-react';
+import { Plus, Trash2, LogOut, Wallet, TrendingUp, TrendingDown, Calendar, Tag, Moon, Sun, Filter, Target, Edit2, BarChart2, Download, CreditCard, Banknote, CheckCircle, Bell, ShoppingCart, Car, Home, Zap, Film, Heart, GraduationCap, ShoppingBag, Settings, User } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import TrendModal from '../components/TrendModal';
 import Modal from '../components/Modal';
@@ -45,8 +45,9 @@ export default function Dashboard({ user, filterDate, setFilterDate }) {
     const [paymentMethod, setPaymentMethod] = useState('cash'); // 'cash' | 'credit_card'
     const [plannedTxns, setPlannedTxns] = useState([]);
     const [showNotifications, setShowNotifications] = useState(false);
+    const [showProfileMenu, setShowProfileMenu] = useState(false);
 
-    // Dynamic Categories State
+    // Dynamic Settings State
     const [expenseCategories, setExpenseCategories] = useState([
         'Market', 'Ulaşım', 'Konut', 'Fatura', 'Eğlence', 'Sağlık', 'Eğitim', 'Giyim', 'Diğer'
     ]);
@@ -55,8 +56,12 @@ export default function Dashboard({ user, filterDate, setFilterDate }) {
     ]);
     const [creditCards, setCreditCards] = useState([]);
     const [selectedCard, setSelectedCard] = useState('');
+    const [currency, setCurrency] = useState('TRY');
+    const [fiscalStartDay, setFiscalStartDay] = useState(1);
+    const [defaultPaymentMethod, setDefaultPaymentMethod] = useState('cash');
+    const [userPhoto, setUserPhoto] = useState(user.photoURL);
 
-    // Fetch User Settings for Categories
+    // Fetch User Settings
     useEffect(() => {
         const unsub = onSnapshot(doc(db, 'user_settings', user.uid), (doc) => {
             if (doc.exists()) {
@@ -64,6 +69,14 @@ export default function Dashboard({ user, filterDate, setFilterDate }) {
                 if (data.expenseCategories) setExpenseCategories(data.expenseCategories);
                 if (data.incomeCategories) setIncomeCategories(data.incomeCategories);
                 if (data.creditCards) setCreditCards(data.creditCards);
+                if (data.currency) setCurrency(data.currency);
+                if (data.fiscalStartDay) setFiscalStartDay(data.fiscalStartDay);
+                if (data.defaultPaymentMethod) {
+                    setDefaultPaymentMethod(data.defaultPaymentMethod);
+                    setPaymentMethod(data.defaultPaymentMethod); // Set initial form value
+                }
+                // Her durumda güncelle (silinmişse null yap veya auth'a dön)
+                setUserPhoto(data.photoURL || user.photoURL || null);
             }
         });
         return () => unsub();
@@ -106,21 +119,15 @@ export default function Dashboard({ user, filterDate, setFilterDate }) {
 
                 let nextDate = new Date(currentYear, currentMonth, day);
 
-                // If day passed, check next month? 
-                // However, for "upcoming" alert, we usually want to see if it's arriving soon.
-                // If today is 25th and billing day is 2nd, next billing is next month.
                 if (today.getDate() > day) {
                     nextDate.setMonth(currentMonth + 1);
                 }
 
-                // Diff in days
                 const diffTime = nextDate - today;
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-                // Alert if due within 3 days (Today, tomorrow, day after etc.)
                 return diffDays >= 0 && diffDays <= 3;
             }).map(sub => {
-                // Return enriched object for display
                 const day = sub.billingDay;
                 const currentMonth = today.getMonth();
                 const currentYear = today.getFullYear();
@@ -146,7 +153,7 @@ export default function Dashboard({ user, filterDate, setFilterDate }) {
             amount: txn.amount,
             type: 'expense',
             category: txn.category,
-            paymentMethod: txn.paymentMethod || 'cash',
+            paymentMethod: txn.paymentMethod || defaultPaymentMethod,
             date: txn.date,
             createdAt: serverTimestamp()
         });
@@ -189,8 +196,6 @@ export default function Dashboard({ user, filterDate, setFilterDate }) {
         return window.matchMedia('(prefers-color-scheme: dark)').matches;
     });
 
-
-
     useEffect(() => {
         if (darkMode) {
             document.documentElement.classList.add('dark');
@@ -229,34 +234,34 @@ export default function Dashboard({ user, filterDate, setFilterDate }) {
         return () => unsubscribe();
     }, [user.uid]);
 
-
-
-    // Filtreleme
+    // Filtreleme - Mali Ay Başlangıcına Göre
     useEffect(() => {
         const filtered = transactions.filter(t => {
-            let itemDate = t.date; // YYYY-MM-DD formatında olmalı
-
-            // Eğer date alanı yoksa, createdAt'ten üret (Eski veriler için fallback)
-            if (!itemDate && t.createdAt?.toDate) {
+            let itemDateStr = t.date; // YYYY-MM-DD
+            if (!itemDateStr && t.createdAt?.toDate) {
                 const d = t.createdAt.toDate();
-                const year = d.getFullYear();
-                const month = String(d.getMonth() + 1).padStart(2, '0');
-                const day = String(d.getDate()).padStart(2, '0');
-                itemDate = `${year}-${month}-${day}`;
+                itemDateStr = d.toISOString().split('T')[0];
             }
+            if (!itemDateStr) return false;
 
-            if (!itemDate) return false;
+            const itemDate = new Date(itemDateStr);
+            const [filterYear, filterMonth] = filterDate.split('-').map(Number); // Selected Month (e.g. 2024-01)
 
-            // YYYY-MM ile başlıyor mu kontrol et
-            return itemDate.startsWith(filterDate);
+            // Calculate Fiscal Month Range
+            let start = new Date(filterYear, filterMonth - 1, fiscalStartDay);
+            let end = new Date(filterYear, filterMonth, fiscalStartDay); // Next month start day
+
+            // If fiscal day is 1, it's a standard month (e.g. 2024-01-01 to 2024-02-01)
+            // itemDate must be >= start AND < end
+            return itemDate >= start && itemDate < end;
         });
         setFilteredTransactions(filtered);
-    }, [transactions, filterDate]);
+    }, [transactions, filterDate, fiscalStartDay]);
 
     // Reset category when type changes
     useEffect(() => {
         setCategory(type === 'expense' ? expenseCategories[0] : incomeCategories[0]);
-    }, [type]);
+    }, [type, expenseCategories, incomeCategories]);
 
     const handleAdd = async (e) => {
         e.preventDefault();
@@ -268,17 +273,16 @@ export default function Dashboard({ user, filterDate, setFilterDate }) {
             amount: parseFloat(amount),
             type,
             category,
-            paymentMethod,
-            cardName: paymentMethod === 'credit_card' ? selectedCard : null,
+            paymentMethod: type === 'expense' ? paymentMethod : 'cash',
+            cardName: (type === 'expense' && paymentMethod === 'credit_card') ? selectedCard : null,
             date,
             createdAt: serverTimestamp()
         });
 
         setAmount('');
         setTitle('');
-        setPaymentMethod('cash');
+        setPaymentMethod(defaultPaymentMethod); // Reset to user default
         setSelectedCard('');
-        // Date ve Category'i resetlemiyoruz, kullanıcının seri giriş yapabilmesi için
     };
 
     const handleDelete = async (id) => {
@@ -382,6 +386,16 @@ export default function Dashboard({ user, filterDate, setFilterDate }) {
         return t.type === 'income' ? acc + t.amount : acc - t.amount;
     }, 0);
 
+    // Bildirimlerde sadece 15 gün içindekileri (veya gecikmişleri) göster
+    const visiblePlannedTxns = plannedTxns.filter(t => {
+        const d = new Date(t.date);
+        d.setHours(0, 0, 0, 0);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const diff = Math.ceil((d - today) / (1000 * 60 * 60 * 24));
+        return diff <= 15;
+    });
+
     return (
         <div className="max-w-5xl mx-auto p-4 lg:p-8 pb-24 lg:pb-8">
             {/* Header */}
@@ -437,9 +451,9 @@ export default function Dashboard({ user, filterDate, setFilterDate }) {
                             className="relative p-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all shadow-sm w-full flex justify-center"
                         >
                             <Bell size={20} />
-                            {(plannedTxns.length + upcomingSubscriptions.length) > 0 && (
+                            {(visiblePlannedTxns.length + upcomingSubscriptions.length) > 0 && (
                                 <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-pulse">
-                                    {plannedTxns.length + upcomingSubscriptions.length}
+                                    {visiblePlannedTxns.length + upcomingSubscriptions.length}
                                 </span>
                             )}
                         </button>
@@ -452,7 +466,7 @@ export default function Dashboard({ user, filterDate, setFilterDate }) {
                                     <button onClick={() => navigate('/calendar')} className="text-xs text-indigo-600 dark:text-indigo-400 font-medium hover:underline">Takvime Git</button>
                                 </div>
                                 <div className="max-h-[360px] overflow-y-auto p-2 space-y-4">
-                                    {(plannedTxns.length === 0 && upcomingSubscriptions.length === 0) ? (
+                                    {(visiblePlannedTxns.length === 0 && upcomingSubscriptions.length === 0) ? (
                                         <div className="p-8 text-center text-slate-400 text-sm">
                                             <Bell className="mx-auto mb-2 opacity-50" size={24} />
                                             <p>Harika! Planlanmış ödemeniz veya yaklaşan aboneliğiniz yok.</p>
@@ -479,7 +493,7 @@ export default function Dashboard({ user, filterDate, setFilterDate }) {
                                                             </div>
                                                             <div className="text-right">
                                                                 <span className="font-bold text-indigo-600 dark:text-indigo-400 text-sm">
-                                                                    {sub.price.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} ₺
+                                                                    {sub.price.toLocaleString('tr-TR', { style: 'currency', currency, maximumFractionDigits: 0 })}
                                                                 </span>
                                                             </div>
                                                         </div>
@@ -493,7 +507,8 @@ export default function Dashboard({ user, filterDate, setFilterDate }) {
                                                 // ... (rest of planned transactions logic continues below)
                                                 today.setHours(0, 0, 0, 0);
 
-                                                const groups = plannedTxns.reduce((acc, txn) => {
+                                                // Calculate groups based on filtered visible transactions
+                                                const groups = visiblePlannedTxns.reduce((acc, txn) => {
                                                     const txnDate = new Date(txn.date);
                                                     txnDate.setHours(0, 0, 0, 0);
                                                     const diffDays = Math.ceil((txnDate - today) / (1000 * 60 * 60 * 24));
@@ -526,7 +541,7 @@ export default function Dashboard({ user, filterDate, setFilterDate }) {
                                                                     </div>
 
                                                                     <div className="flex items-center gap-3">
-                                                                        <span className="font-bold text-slate-700 dark:text-slate-300 text-sm">{txn.amount.toLocaleString('tr-TR')} ₺</span>
+                                                                        <span className="font-bold text-slate-700 dark:text-slate-300 text-sm">{txn.amount.toLocaleString('tr-TR', { style: 'currency', currency })}</span>
 
                                                                         <button
                                                                             onClick={() => handleCompletePlanned(txn)}
@@ -554,11 +569,11 @@ export default function Dashboard({ user, filterDate, setFilterDate }) {
                                     )}
                                 </div>
 
-                                {plannedTxns.length > 0 && (
+                                {visiblePlannedTxns.length > 0 && (
                                     <div className="p-3 bg-slate-50 dark:bg-slate-900/40 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center text-xs font-medium">
-                                        <span className="text-slate-500">Toplam Bekleyen</span>
+                                        <span className="text-slate-500">Toplam Bekleyen (15 Gün)</span>
                                         <span className="text-slate-800 dark:text-slate-200 text-sm">
-                                            {plannedTxns.reduce((sum, t) => sum + t.amount, 0).toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}
+                                            {visiblePlannedTxns.reduce((sum, t) => sum + t.amount, 0).toLocaleString('tr-TR', { style: 'currency', currency })}
                                         </span>
                                     </div>
                                 )}
@@ -574,14 +589,50 @@ export default function Dashboard({ user, filterDate, setFilterDate }) {
                         {darkMode ? <Sun size={20} /> : <Moon size={20} />}
                     </button>
 
-                    {/* Logout */}
-                    <button
-                        onClick={() => signOut(auth)}
-                        className="col-span-1 p-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors flex justify-center w-full md:order-6"
-                        title="Çıkış Yap"
-                    >
-                        <LogOut size={20} />
-                    </button>
+                    {/* Profile Dropdown */}
+                    <div className="col-span-1 relative flex justify-center md:block md:order-6">
+                        <button
+                            onClick={() => setShowProfileMenu(!showProfileMenu)}
+                            className="p-1 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all flex items-center justify-center w-full md:w-auto overflow-hidden"
+                        >
+                            {userPhoto ? (
+                                <img src={userPhoto} alt="Profil" className="w-8 h-8 rounded-md object-cover" />
+                            ) : (
+                                <div className="w-8 h-8 rounded-md bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                                    <User size={20} />
+                                </div>
+                            )}
+                        </button>
+
+                        {/* Dropdown */}
+                        {showProfileMenu && (
+                            <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden z-50">
+                                <div
+                                    onClick={() => navigate('/settings', { state: { initialTab: 'profile' } })}
+                                    className="p-3 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/20 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                >
+                                    <p className="font-semibold text-slate-800 dark:text-slate-200 text-sm truncate">{user.displayName || 'Kullanıcı'}</p>
+                                    <p className="text-xs text-slate-500 truncate">{user.email}</p>
+                                </div>
+                                <div className="p-1">
+                                    <button
+                                        onClick={() => navigate('/settings', { state: { initialTab: 'profile' } })}
+                                        className="w-full text-left px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg flex items-center gap-2 transition-colors"
+                                    >
+                                        <Settings size={16} />
+                                        Ayarlar
+                                    </button>
+                                    <button
+                                        onClick={() => signOut(auth)}
+                                        className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg flex items-center gap-2 transition-colors"
+                                    >
+                                        <LogOut size={16} />
+                                        Çıkış Yap
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </header>
 
@@ -604,7 +655,7 @@ export default function Dashboard({ user, filterDate, setFilterDate }) {
                     <div className="flex justify-between items-start mb-4">
                         <div>
                             <p className="text-indigo-100 font-medium mb-1">Dönem Bakiyesi</p>
-                            <h2 className="text-3xl font-bold">{balance.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</h2>
+                            <h2 className="text-3xl font-bold">{balance.toLocaleString('tr-TR', { style: 'currency', currency })}</h2>
                         </div>
                         <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
                             <Wallet size={24} className="text-white" />
@@ -612,14 +663,14 @@ export default function Dashboard({ user, filterDate, setFilterDate }) {
                     </div>
                     <div className="flex items-center gap-2 text-sm text-indigo-100 bg-white/10 p-2 rounded-lg backdrop-blur-sm inline-flex">
                         <Wallet size={14} />
-                        <span>Toplam Varlık: {globalBalance.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</span>
+                        <span>Toplam Varlık: {globalBalance.toLocaleString('tr-TR', { style: 'currency', currency })}</span>
                     </div>
                 </div>
 
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center justify-between transition-colors duration-300">
                     <div>
                         <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-1">Gelirler</p>
-                        <h2 className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">+{totalIncome.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</h2>
+                        <h2 className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">+{totalIncome.toLocaleString('tr-TR', { style: 'currency', currency })}</h2>
                     </div>
                     <div className="p-3 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-full">
                         <TrendingUp size={24} />
@@ -629,7 +680,7 @@ export default function Dashboard({ user, filterDate, setFilterDate }) {
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center justify-between transition-colors duration-300">
                     <div>
                         <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-1">Giderler</p>
-                        <h2 className="text-2xl font-bold text-red-600 dark:text-red-400">-{totalExpense.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</h2>
+                        <h2 className="text-2xl font-bold text-red-600 dark:text-red-400">-{totalExpense.toLocaleString('tr-TR', { style: 'currency', currency })}</h2>
                     </div>
                     <div className="p-3 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full">
                         <TrendingDown size={24} />

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { User, Palette, Tag, Shield, Save, Plus, Trash2, Moon, Sun, Monitor, Lock, CreditCard } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
+import { User, Palette, Tag, Shield, Save, Plus, Trash2, Moon, Sun, Monitor, Lock, CreditCard, Bell, TrendingUp, Calendar, UserCircle } from 'lucide-react';
 import { db, auth } from '../firebase';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { updateProfile, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
@@ -13,18 +14,24 @@ const DEFAULT_INCOME_CATEGORIES = [
 ];
 
 export default function SettingsPage({ user }) {
-    const [activeTab, setActiveTab] = useState('cards'); // Yeni özellik öne çıksın
+    const location = useLocation();
+    const [activeTab, setActiveTab] = useState(location.state?.initialTab || 'cards');
     const [loading, setLoading] = useState(true);
     const [settings, setSettings] = useState({
         expenseCategories: DEFAULT_EXPENSE_CATEGORIES,
         incomeCategories: DEFAULT_INCOME_CATEGORIES,
         creditCards: [], // Yeni: Kredi Kartları
         theme: 'system',
-        currency: 'TRY'
+        currency: 'TRY',
+        fiscalStartDay: 1, // Yeni: Mali Ay Başlangıcı
+        defaultPaymentMethod: 'cash', // Yeni: Varsayılan Ödeme Yöntemi
+        enableBudgetAlerts: true, // Yeni: Bütçe uyarıları
+        enableSubscriptionAlerts: true // Yeni: Abonelik uyarıları
     });
 
     // Profil State
     const [displayName, setDisplayName] = useState(user.displayName || '');
+    const [photoURL, setPhotoURL] = useState(user.photoURL || '');
     const [isSavingProfile, setIsSavingProfile] = useState(false);
 
     // Kategori & Kart State
@@ -49,6 +56,7 @@ export default function SettingsPage({ user }) {
                     ...data,
                     creditCards: data.creditCards || [] // Geriye dönük uyumluluk
                 });
+                if (data.photoURL) setPhotoURL(data.photoURL);
             } else {
                 await setDoc(docRef, settings);
             }
@@ -141,7 +149,9 @@ export default function SettingsPage({ user }) {
         e.preventDefault();
         setIsSavingProfile(true);
         try {
-            await updateProfile(user, { displayName });
+            await updateProfile(user, { displayName, photoURL });
+            // Firestore 'user_settings' updates optional but good for syncing if needed elsewhere
+            await updateDoc(doc(db, 'user_settings', user.uid), { displayName, photoURL });
             alert('Profil güncellendi!');
         } catch (error) {
             console.error(error);
@@ -177,6 +187,7 @@ export default function SettingsPage({ user }) {
         { id: 'cards', label: 'Kartlarım', icon: CreditCard },
         { id: 'categories', label: 'Kategoriler', icon: Tag },
         { id: 'preferences', label: 'Görünüm', icon: Palette },
+        { id: 'notifications', label: 'Bildirimler', icon: Bell },
         { id: 'profile', label: 'Profil', icon: User },
         { id: 'security', label: 'Güvenlik', icon: Shield },
     ];
@@ -196,8 +207,8 @@ export default function SettingsPage({ user }) {
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`w-full flex items-center gap-3 p-4 text-sm font-medium transition-colors ${activeTab === tab.id
-                                        ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border-l-4 border-indigo-600'
-                                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 border-l-4 border-transparent'
+                                    ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border-l-4 border-indigo-600'
+                                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 border-l-4 border-transparent'
                                     }`}
                             >
                                 <tab.icon size={18} />
@@ -328,11 +339,12 @@ export default function SettingsPage({ user }) {
                                 <div>
                                     <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-4 flex items-center gap-2">
                                         <Palette className="text-indigo-600" size={20} />
-                                        Görünüm & Tercihler
+                                        Görünüm & Uygulama Tercihleri
                                     </h3>
 
                                     <div className="space-y-6">
-                                        <div>
+                                        {/* Tema Ayarları */}
+                                        <div className="pb-6 border-b border-slate-100 dark:border-slate-700">
                                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Tema Seçimi</label>
                                             <div className="grid grid-cols-3 gap-4">
                                                 <button
@@ -359,22 +371,127 @@ export default function SettingsPage({ user }) {
                                             </div>
                                         </div>
 
-                                        <div>
-                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Para Birimi</label>
-                                            <select
-                                                value={settings.currency}
-                                                onChange={(e) => {
-                                                    const newCurrency = e.target.value;
-                                                    setSettings({ ...settings, currency: newCurrency });
-                                                    updateDoc(doc(db, 'user_settings', user.uid), { currency: newCurrency });
-                                                }}
-                                                className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                            >
-                                                <option value="TRY">Türk Lirası (₺)</option>
-                                                <option value="USD">Amerikan Doları ($)</option>
-                                                <option value="EUR">Euro (€)</option>
-                                            </select>
+                                        {/* Genel Uygulama Ayarları */}
+                                        <div className="grid md:grid-cols-2 gap-6">
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Para Birimi</label>
+                                                <select
+                                                    value={settings.currency}
+                                                    onChange={(e) => {
+                                                        const newCurrency = e.target.value;
+                                                        setSettings({ ...settings, currency: newCurrency });
+                                                        updateDoc(doc(db, 'user_settings', user.uid), { currency: newCurrency });
+                                                    }}
+                                                    className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                                >
+                                                    <option value="TRY">Türk Lirası (₺)</option>
+                                                    <option value="USD">Amerikan Doları ($)</option>
+                                                    <option value="EUR">Euro (€)</option>
+                                                    <option value="GBP">İngiliz Sterlini (£)</option>
+                                                </select>
+                                                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Tüm finansal verileriniz bu birimde gösterilir.</p>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Varsayılan Ödeme Yöntemi</label>
+                                                <select
+                                                    value={settings.defaultPaymentMethod || 'cash'}
+                                                    onChange={(e) => {
+                                                        const newVal = e.target.value;
+                                                        setSettings({ ...settings, defaultPaymentMethod: newVal });
+                                                        updateDoc(doc(db, 'user_settings', user.uid), { defaultPaymentMethod: newVal });
+                                                    }}
+                                                    className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                                >
+                                                    <option value="cash">Nakit</option>
+                                                    <option value="credit_card">Kredi Kartı</option>
+                                                </select>
+                                                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Yeni harcama eklerken otomatik seçilecek yöntem.</p>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Mali Ay Başlangıcı</label>
+                                                <select
+                                                    value={settings.fiscalStartDay || 1}
+                                                    onChange={(e) => {
+                                                        const newVal = parseInt(e.target.value);
+                                                        setSettings({ ...settings, fiscalStartDay: newVal });
+                                                        updateDoc(doc(db, 'user_settings', user.uid), { fiscalStartDay: newVal });
+                                                    }}
+                                                    className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                                >
+                                                    {[...Array(31)].map((_, i) => (
+                                                        <option key={i + 1} value={i + 1}>{i + 1}. Gün</option>
+                                                    ))}
+                                                </select>
+                                                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Bütçe ve raporlarınızın döngüsü bu günde başlar.</p>
+                                            </div>
                                         </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 5. BİLDİRİM AYARLARI */}
+                        {activeTab === 'notifications' && (
+                            <div className="space-y-6">
+                                <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-4 flex items-center gap-2">
+                                    <Bell className="text-indigo-600" size={20} />
+                                    Bildirim Tercihleri
+                                </h3>
+                                <p className="text-sm text-slate-500 mb-6">Hangi durumlarda uyarı almak istediğinizi buradan yönetebilirsiniz.</p>
+
+                                <div className="space-y-4">
+                                    {/* Budget Alerts */}
+                                    <div className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg">
+                                                <TrendingUp size={20} />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-semibold text-slate-800 dark:text-slate-200">Bütçe Aşım Uyarıları</h4>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400">Belirlediğiniz kategori limitini aştığınızda bildirim alın.</p>
+                                            </div>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                className="sr-only peer"
+                                                checked={settings.enableBudgetAlerts ?? true}
+                                                onChange={async (e) => {
+                                                    const newVal = e.target.checked;
+                                                    setSettings({ ...settings, enableBudgetAlerts: newVal });
+                                                    await updateDoc(doc(db, 'user_settings', user.uid), { enableBudgetAlerts: newVal });
+                                                }}
+                                            />
+                                            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 dark:peer-focus:ring-indigo-800 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-600"></div>
+                                        </label>
+                                    </div>
+
+                                    {/* Subscription Alerts */}
+                                    <div className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-lg">
+                                                <Calendar size={20} />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-semibold text-slate-800 dark:text-slate-200">Abonelik Hatırlatıcıları</h4>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400">Yaklaşan sabit ödemeleriniz için hatırlatma alın.</p>
+                                            </div>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                className="sr-only peer"
+                                                checked={settings.enableSubscriptionAlerts ?? true}
+                                                onChange={async (e) => {
+                                                    const newVal = e.target.checked;
+                                                    setSettings({ ...settings, enableSubscriptionAlerts: newVal });
+                                                    await updateDoc(doc(db, 'user_settings', user.uid), { enableSubscriptionAlerts: newVal });
+                                                }}
+                                            />
+                                            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 dark:peer-focus:ring-indigo-800 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-600"></div>
+                                        </label>
                                     </div>
                                 </div>
                             </div>
@@ -389,6 +506,29 @@ export default function SettingsPage({ user }) {
                                 </h3>
                                 <form onSubmit={handleUpdateProfile} className="space-y-4 max-w-md">
                                     <div>
+                                        <div className="flex items-center gap-4 mb-4">
+                                            <div className="w-20 h-20 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700 flex items-center justify-center border-2 border-indigo-100 dark:border-indigo-900">
+                                                {photoURL ? (
+                                                    <img src={photoURL} alt="Profil" className="w-full h-full object-cover" onError={(e) => { e.target.src = '' }} />
+                                                ) : (
+                                                    <UserCircle size={48} className="text-slate-400" />
+                                                )}
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-slate-800 dark:text-slate-200">Profil Fotoğrafı</p>
+                                                <p className="text-xs text-slate-500">Bir resim URL'si girerek profil fotoğrafınızı güncelleyin.</p>
+                                            </div>
+                                        </div>
+
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Profil Resmi URL</label>
+                                        <input
+                                            type="url"
+                                            value={photoURL}
+                                            onChange={(e) => setPhotoURL(e.target.value)}
+                                            placeholder="https://example.com/my-photo.jpg"
+                                            className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
+                                        />
+
                                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">E-posta Adresi</label>
                                         <input
                                             type="email"

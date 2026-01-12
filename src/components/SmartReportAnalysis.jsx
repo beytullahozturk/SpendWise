@@ -5,10 +5,13 @@ import {
     TrendingDown,
     AlertTriangle,
     Target,
-    Info
+    Info,
+    Lightbulb,
+    Activity,
+    Award
 } from 'lucide-react';
 
-export default function SmartReportAnalysis({ transactions, timeRange }) {
+export default function SmartReportAnalysis({ transactions, timeRange, currency = 'TRY' }) {
     const [analysis, setAnalysis] = useState(null);
 
     useEffect(() => {
@@ -20,6 +23,8 @@ export default function SmartReportAnalysis({ transactions, timeRange }) {
             wantsPercent: 0,
             projectedYearly: 0,
             saving: 0,
+            score: 0,
+            tips: [],
             hasData: false
         };
 
@@ -119,6 +124,58 @@ export default function SmartReportAnalysis({ transactions, timeRange }) {
         const saving = currentData.income - currentData.expense;
         const projectedYearly = saving * 12;
 
+        // new calculations
+        const savingsRate = currentData.income > 0 ? (saving / currentData.income) : 0;
+
+        // 5. Financial Health Score (Basit Algoritma)
+        // Başlangıç: 50
+        // Tasarruf oranı > %20 (+20 puan), > %10 (+10 puan)
+        // Needs oranı %50 civarındaysa (+20 puan) -> abs(50 - needs) farkı kadar düş
+        // Borç yoksa (+10 puan) -> expense > income ise (-20 puan)
+
+        let score = 50;
+        if (savingsRate >= 0.20) score += 30;
+        else if (savingsRate >= 0.10) score += 15;
+        else if (savingsRate > 0) score += 5;
+
+        // İhtiyaç Dengesi (50'ye ne kadar yakınsa o kadar iyi)
+        const diffNeeds = Math.abs(50 - needsPercent);
+        if (diffNeeds < 10) score += 20;
+        else if (diffNeeds < 20) score += 10;
+
+        // Bütçe Dengesi
+        if (currentData.expense > currentData.income && currentData.income > 0) score -= 20;
+        else score += 10;
+
+        if (transactions.length < 5) score = 60; // Yetersiz veri varsa nötr
+        score = Math.min(100, Math.max(0, score)); // 0-100 arası
+
+        // 6. Smart Tips
+        const tips = [];
+        // En yüksek harcama yapılan "İstek" kategorisini bul
+        let topWantCat = '';
+        let topWantAmount = 0;
+        Object.entries(currentData.categories).forEach(([cat, amount]) => {
+            if (!NEEDS.includes(cat) && amount > topWantAmount) {
+                topWantAmount = amount;
+                topWantCat = cat;
+            }
+        });
+
+        if (topWantCat && topWantAmount > 0) {
+            tips.push(`"${topWantCat}" harcamalarını %10 azaltarak ayda ekstra ${(topWantAmount * 0.1).toLocaleString('tr-TR', { style: 'currency', currency, maximumFractionDigits: 0 })} biriktirebilirsin.`);
+        }
+
+        if (needsPercent > 70) {
+            tips.push("Zorunlu giderlerin bütçenin büyük kısmını (%70+) kaplıyor. Sabit giderleri (kira, fatura) gözden geçirmek isteyebilirsin.");
+        }
+
+        if (savingsRate < 0.1 && currentData.income > 0) {
+            tips.push("Tasarruf oranın %10'un altında. Küçük tutarlarla başlayıp birikim yapmayı deneyebilirsin.");
+        }
+
+        if (tips.length === 0) tips.push("Finansal durumun gayet dengeli görünüyor! Böyle devam et.");
+
         setAnalysis({
             narrative,
             anomalies,
@@ -126,105 +183,126 @@ export default function SmartReportAnalysis({ transactions, timeRange }) {
             wantsPercent,
             projectedYearly,
             saving,
+            score,
+            tips,
             hasData: true
         });
 
     }, [transactions, timeRange]);
 
-    if (!analysis) return <div className="p-4 bg-white dark:bg-slate-800 rounded-2xl mb-8 text-center text-slate-500 animate-pulse">Yapay Zeka Analizleri Hazırlanıyor...</div>;
+    // ...
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {/* 1. Akıllı Özet KArtı */}
-            <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-5 text-white shadow-lg lg:col-span-2 relative overflow-hidden">
+            {/* 1. Yapay Zeka Özeti & İpuçları */}
+            <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-2xl p-6 text-white shadow-xl lg:col-span-2 relative overflow-hidden flex flex-col justify-between">
                 <div className="relative z-10">
-                    <div className="flex items-center gap-2 mb-3">
-                        <Zap className="text-yellow-300" size={20} />
-                        <h3 className="font-bold text-lg">Yapay Zeka Özeti</h3>
-                    </div>
-                    <p className="text-indigo-50 text-base leading-relaxed font-medium">
-                        {analysis.narrative}
-                    </p>
-                    {analysis.anomalies.length > 0 && (
-                        <div className="mt-4 bg-white/10 rounded-lg p-3 backdrop-blur-sm border border-white/10">
-                            <p className="text-xs text-indigo-200 uppercase font-bold mb-1">Dikkat Çekenler</p>
-                            {analysis.anomalies.map(a => (
-                                <div key={a.category} className="flex items-center gap-2 text-sm">
-                                    <AlertTriangle size={14} className="text-yellow-300" />
-                                    <span>{a.category} harcaması geçen aya göre </span>
-                                    <span className="font-bold text-white">
-                                        {a.increase === 100 ? 'yeni eklendi!' : `%${(a.increase).toFixed(0)} arttı`}
-                                    </span>
-                                </div>
-                            ))}
+                    <div className="flex items-center gap-2 mb-4">
+                        <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                            <Zap className="text-yellow-300 fill-yellow-300" size={20} />
                         </div>
-                    )}
+                        <h3 className="font-bold text-lg">Yapay Zeka Analizi</h3>
+                    </div>
+
+                    <p className="text-indigo-50 text-lg leading-relaxed font-medium mb-6">
+                        {analysis?.narrative}
+                    </p>
+
+                    <div className="bg-white/10 rounded-xl p-4 backdrop-blur-md border border-white/10 space-y-3">
+                        <div className="flex items-center gap-2 text-indigo-200 text-xs font-bold uppercase tracking-wider">
+                            <Lightbulb size={14} />
+                            <span>Akıllı Tavsiyeler</span>
+                        </div>
+                        {analysis?.tips.slice(0, 2).map((tip, idx) => (
+                            <div key={idx} className="flex gap-3 items-start">
+                                <div className="min-w-1.5 h-1.5 rounded-full bg-yellow-400 mt-2"></div>
+                                <p className="text-sm text-white/90 font-medium">{tip}</p>
+                            </div>
+                        ))}
+                    </div>
                 </div>
-                {/* Decorative BG */}
-                <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
+
+                {/* Decorative Elements */}
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-16 -marginTop-16"></div>
+                <div className="absolute bottom-0 left-0 w-40 h-40 bg-indigo-500/30 rounded-full blur-2xl -ml-10 -marginBottom-10"></div>
             </div>
 
-            {/* 2. Needs vs Wants */}
-            <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border border-slate-100 dark:border-slate-700">
-                <div className="flex items-center gap-2 mb-4 text-slate-800 dark:text-slate-100 font-bold">
-                    <Target className="text-emerald-500" size={20} />
-                    <h3>İhtiyaç / İstek Dengesi</h3>
+            {/* 2. Finansal Sağlık Skoru */}
+            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col items-center justify-center relative overflow-hidden">
+                <div className="absolute top-4 left-4 flex items-center gap-2 text-slate-800 dark:text-slate-100 font-bold z-10">
+                    <Activity className="text-rose-500" size={20} />
+                    <h3>Finans Puanı</h3>
                 </div>
 
-                <div className="space-y-4">
-                    <div>
-                        <div className="flex justify-between text-sm mb-1">
-                            <span className="text-slate-500">Zorunlu (İhtiyaç)</span>
-                            <span className="font-bold text-slate-700 dark:text-slate-200">%{(analysis.needsPercent || 0).toFixed(0)}</span>
-                        </div>
-                        <div className="h-2 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                            <div className="h-full bg-emerald-500" style={{ width: `${analysis.needsPercent || 0}%` }}></div>
-                        </div>
+                <div className="relative w-32 h-32 flex items-center justify-center mt-4">
+                    {/* Circular Chart Background */}
+                    <svg className="w-full h-full transform -rotate-90">
+                        <circle
+                            cx="64"
+                            cy="64"
+                            r="56"
+                            stroke="currentColor"
+                            strokeWidth="12"
+                            fill="transparent"
+                            className="text-slate-100 dark:text-slate-700"
+                        />
+                        <circle
+                            cx="64"
+                            cy="64"
+                            r="56"
+                            stroke="currentColor"
+                            strokeWidth="12"
+                            fill="transparent"
+                            strokeDasharray={351.86} // 2 * PI * 56
+                            strokeDashoffset={351.86 - (351.86 * (analysis?.score || 0)) / 100}
+                            className={`${(analysis?.score || 0) > 70 ? 'text-emerald-500' : (analysis?.score || 0) > 40 ? 'text-amber-500' : 'text-red-500'} transition-all duration-1000 ease-out`}
+                            strokeLinecap="round"
+                        />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="text-3xl font-black text-slate-800 dark:text-white">{Math.round(analysis?.score || 0)}</span>
+                        <span className="text-[10px] text-slate-400 font-medium uppercase tracking-widest">/ 100</span>
                     </div>
-                    <div>
-                        <div className="flex justify-between text-sm mb-1">
-                            <span className="text-slate-500">Keyfi (İstek)</span>
-                            <span className="font-bold text-slate-700 dark:text-slate-200">%{(analysis.wantsPercent || 0).toFixed(0)}</span>
-                        </div>
-                        <div className="h-2 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                            <div className="h-full bg-amber-500" style={{ width: `${analysis.wantsPercent || 0}%` }}></div>
-                        </div>
-                    </div>
-                    <p className="text-xs text-slate-400 mt-2 italic">
-                        *Market, Fatura, Kira vb. zorunlu; Eğlence, Yeme-İçme keyfi olarak analiz edilmiştir. (İdeal: 50/30/20)
-                    </p>
                 </div>
+                <p className={`mt-4 text-sm font-medium px-3 py-1 rounded-full ${(analysis?.score || 0) > 70 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                    (analysis?.score || 0) > 40 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                        'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                    }`}>
+                    {(analysis?.score || 0) > 70 ? 'Mükemmel' : (analysis?.score || 0) > 40 ? 'İdare Eder' : 'Riskli'}
+                </p>
             </div>
 
             {/* 3. Gelecek Tahmini */}
-            <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border border-slate-100 dark:border-slate-700">
-                <div className="flex items-center gap-2 mb-4 text-slate-800 dark:text-slate-100 font-bold">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 opacity-5">
+                    <TrendingUp size={100} />
+                </div>
+
+                <div className="flex items-center gap-2 mb-6 text-slate-800 dark:text-slate-100 font-bold relative z-10">
                     <TrendingUp className="text-blue-500" size={20} />
                     <h3>Gelecek Tahmini</h3>
                 </div>
 
-                <div className="flex flex-col justify-center h-32">
-                    <p className="text-sm text-slate-500 mb-1">Mevcut hızla yıl sonu tahmini:</p>
+                <div className="flex-1 flex flex-col justify-center relative z-10">
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Mevcut hızla yıl sonu:</p>
+                    <h4 className={`text-2xl font-bold ${analysis?.projectedYearly >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {analysis?.projectedYearly > 0 ? '+' : ''}{analysis?.projectedYearly.toLocaleString('tr-TR', { style: 'currency', currency, maximumFractionDigits: 0 })}
+                    </h4>
 
-                    {analysis.projectedYearly > 0 ? (
-                        <>
-                            <h4 className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                                +{analysis.projectedYearly.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} TL
-                            </h4>
-                            <p className="text-xs text-emerald-600/80 bg-emerald-50 dark:bg-emerald-900/20 p-2 rounded-lg mt-2 font-medium">
-                                "Tasarruf modun harika! Birikim hedeflerine yaklaşıyorsun."
-                            </p>
-                        </>
-                    ) : (
-                        <>
-                            <h4 className="text-2xl font-bold text-red-500">
-                                {analysis.projectedYearly.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} TL
-                            </h4>
-                            <p className="text-xs text-red-600/80 bg-red-50 dark:bg-red-900/20 p-2 rounded-lg mt-2 font-medium">
-                                "Bütçe açığı var. Harcamaları kısmazsan yıl sonu zor geçebilir."
-                            </p>
-                        </>
-                    )}
+                    <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-600">
+                        <div className="flex items-center gap-2 mb-1">
+                            <Target size={14} className="text-indigo-500" />
+                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300">İhtiyaç / İstek</span>
+                        </div>
+                        <div className="flex h-2 w-full rounded-full overflow-hidden">
+                            <div className="bg-emerald-500" style={{ width: `${analysis?.needsPercent}%` }} title="İhtiyaç"></div>
+                            <div className="bg-amber-500" style={{ width: `${analysis?.wantsPercent}%` }} title="İstek"></div>
+                        </div>
+                        <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+                            <span>%{analysis?.needsPercent.toFixed(0)} Zorunlu</span>
+                            <span>%{analysis?.wantsPercent.toFixed(0)} Keyfi</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

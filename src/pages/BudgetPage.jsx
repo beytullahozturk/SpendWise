@@ -12,11 +12,25 @@ export default function BudgetPage({ user, filterDate, setFilterDate }) {
     const [transactions, setTransactions] = useState([]);
     const [budgets, setBudgets] = useState({});
     const [loading, setLoading] = useState(true);
+    const [currency, setCurrency] = useState('TRY');
+    const [fiscalStartDay, setFiscalStartDay] = useState(1);
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState(null);
     const [budgetLimit, setBudgetLimit] = useState('');
+
+    // Fetch Settings
+    useEffect(() => {
+        const unsub = onSnapshot(doc(db, 'user_settings', user.uid), (doc) => {
+            if (doc.exists()) {
+                const data = doc.data();
+                if (data.currency) setCurrency(data.currency);
+                if (data.fiscalStartDay) setFiscalStartDay(data.fiscalStartDay);
+            }
+        });
+        return () => unsub();
+    }, [user.uid]);
 
     // Fetch Transactions
     useEffect(() => {
@@ -75,12 +89,22 @@ export default function BudgetPage({ user, filterDate, setFilterDate }) {
 
     // Calculations
     const currentMonthTransactions = transactions.filter(t => {
-        let itemDate = t.date;
-        if (!itemDate && t.createdAt?.toDate) {
+        let itemDateStr = t.date;
+        if (!itemDateStr && t.createdAt?.toDate) {
             const d = t.createdAt.toDate();
-            itemDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            itemDateStr = d.toISOString().split('T')[0];
         }
-        return itemDate && itemDate.startsWith(filterDate) && t.type === 'expense';
+        if (!itemDateStr) return false;
+        if (t.type !== 'expense') return false;
+
+        const itemDate = new Date(itemDateStr);
+        const [filterYear, filterMonth] = filterDate.split('-').map(Number);
+
+        // Fiscal Month Logic
+        let start = new Date(filterYear, filterMonth - 1, fiscalStartDay);
+        let end = new Date(filterYear, filterMonth, fiscalStartDay);
+
+        return itemDate >= start && itemDate < end;
     });
 
     const categorySpendings = currentMonthTransactions.reduce((acc, t) => {
@@ -132,7 +156,7 @@ export default function BudgetPage({ user, filterDate, setFilterDate }) {
                     </div>
                     <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Toplam Bütçe Hedefi</p>
                     <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-1">
-                        {totalBudget.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}
+                        {totalBudget.toLocaleString('tr-TR', { style: 'currency', currency, maximumFractionDigits: 0 })}
                     </h3>
                     <div className="mt-4 w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full">
                         <div className="bg-indigo-500 h-1.5 rounded-full" style={{ width: '100%' }}></div>
@@ -145,7 +169,7 @@ export default function BudgetPage({ user, filterDate, setFilterDate }) {
                     </div>
                     <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Harcanan Tutar</p>
                     <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-1">
-                        {totalSpentInBudgeted.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}
+                        {totalSpentInBudgeted.toLocaleString('tr-TR', { style: 'currency', currency, maximumFractionDigits: 0 })}
                     </h3>
                     <div className="mt-4 w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full">
                         <div
@@ -161,7 +185,7 @@ export default function BudgetPage({ user, filterDate, setFilterDate }) {
                     </div>
                     <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Kalan Kullanılabilir</p>
                     <h3 className={`text-2xl font-bold mt-1 ${totalRemaining < 0 ? 'text-red-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                        {totalRemaining.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}
+                        {totalRemaining.toLocaleString('tr-TR', { style: 'currency', currency, maximumFractionDigits: 0 })}
                     </h3>
                     <p className="text-xs text-slate-400 mt-2">
                         {totalRemaining < 0 ? 'Toplam bütçe hedefini aştınız.' : 'Bütçe hedeflerine göre güvendesiniz.'}
@@ -221,11 +245,11 @@ export default function BudgetPage({ user, filterDate, setFilterDate }) {
                                     <div className="text-right w-full">
                                         <div className="flex justify-between text-sm mb-1 text-slate-500 dark:text-slate-400">
                                             <span>Harcanan</span>
-                                            <span className={percentage > 100 ? 'text-red-500 font-bold' : ''}>{spent.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} TL</span>
+                                            <span className={percentage > 100 ? 'text-red-500 font-bold' : ''}>{spent.toLocaleString('tr-TR', { style: 'currency', currency, maximumFractionDigits: 0 })}</span>
                                         </div>
                                         <div className="flex justify-between text-sm mb-1 font-medium text-slate-700 dark:text-slate-300">
                                             <span>Limit</span>
-                                            <span>{limit > 0 ? limit.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) + ' TL' : '-'}</span>
+                                            <span>{limit > 0 ? limit.toLocaleString('tr-TR', { style: 'currency', currency, maximumFractionDigits: 0 }) : '-'}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -245,14 +269,14 @@ export default function BudgetPage({ user, filterDate, setFilterDate }) {
                                             <>
                                                 <CheckCircle size={14} className="text-emerald-500" />
                                                 <span className="text-emerald-600 dark:text-emerald-400">
-                                                    {remaining.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} TL harcayabilirsiniz
+                                                    {remaining.toLocaleString('tr-TR', { style: 'currency', currency, maximumFractionDigits: 0 })} harcayabilirsiniz
                                                 </span>
                                             </>
                                         ) : (
                                             <>
                                                 <AlertTriangle size={14} className="text-red-500" />
                                                 <span className="text-red-600 dark:text-red-400">
-                                                    {Math.abs(remaining).toLocaleString('tr-TR', { maximumFractionDigits: 0 })} TL aştınız
+                                                    {Math.abs(remaining).toLocaleString('tr-TR', { style: 'currency', currency, maximumFractionDigits: 0 })} aştınız
                                                 </span>
                                             </>
                                         )}
