@@ -1,5 +1,8 @@
 # SpendWise - Kişisel Gelir/Gider Takip Uygulaması
 
+![Version](https://img.shields.io/badge/sürüm-v1.2.0-blue)
+![Status](https://img.shields.io/badge/durum-aktif-success)
+
 SpendWise, kullanıcıların finansal durumlarını kontrol altına almalarına yardımcı olmak için tasarlanmış modern, kullanıcı dostu ve kapsamlı bir E-Cüzdan uygulamasıdır. Gelir ve giderlerinizi takip edebilir, bütçe planlamaları yapabilir ve detaylı raporlarla harcama alışkanlıklarınızı analiz edebilirsiniz.
 
 ## 🎯 Projenin Amacı
@@ -46,17 +49,27 @@ Uygulama aşağıdaki temel modüllerden oluşmaktadır:
     *   Kategorilere göre aylık bütçe tanımlama.
     *   Bütçe aşım uyarıları ve ilerleme çubukları.
 
-4.  **Raporlar ve Analizler**
-    *   Gelir ve giderlerin detaylı grafiksel dağılımı.
-    *   Kredi kartı bazlı harcama raporları.
-    *   Zaman içindeki finansal trendler.
+4.  **Raporlar ve Yapay Zeka (AI)**
+    *   **Finansal Sağlık Puanı:** Harcama alışkanlıklarınıza göre 0-100 arası puanlama.
+    *   **Akıllı Tavsiyeler:** Yapay zeka destekli tasarruf önerileri.
+    *   **Gelecek Tahmini:** Yıl sonu bakiye projeksiyonu.
+    *   **Detaylı Analizler:** Kategori pasta grafikleri ve aylık karşılaştırmalar.
 
-5.  **Takvim Görünümü**
-    *   Günlük bazda yapılan harcama ve gelirlerin takvim üzerinde görüntülenmesi.
+5.  **Abonelik Yönetimi**
+    *   Netflix, Spotify gibi düzenli ödemelerin takibi.
+    *   Ödeme günü yaklaşan servisler için bildirimler (15 gün önceden).
 
-6.  **Ayarlar ve Kart Yönetimi**
-    *   Kullanıcı tercihleri.
-    *   Kredi kartı ekleme, düzenleme ve silme işlemleri.
+6.  **Yatırım Portföyü**
+    *   Hisse senedi, Altın ve Döviz varlıklarının anlık değer takibi.
+    *   Varlık alım/satım geçmişi ve maliyet analizi.
+
+7.  **Takvim Görünümü**
+    *   Günlük bazda yapılan harcama, gelir ve yaklaşan ödemelerin takvim üzerinde görüntülenmesi.
+
+8.  **Ayarlar ve Profil**
+    *   Profil fotoğrafı ve kullanıcı bilgileri güncelleme.
+    *   Bildirim tercihleri (Bütçe ve Abonelik uyarıları).
+    *   Kredi kartı yönetimi, tema ve para birimi ayarları.
 
 ## 🤖 Geliştirici Hakkında (Antigravity)
 
