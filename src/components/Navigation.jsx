@@ -42,7 +42,7 @@ export default function Navigation() {
                 </div>
 
                 <div className="mt-auto pt-6 border-t border-slate-100 dark:border-slate-800">
-                    <p className="text-xs text-slate-400 text-center">v1.1.0 • SpendWise</p>
+                    <p className="text-xs text-slate-400 text-center">v1.2.0 • SpendWise</p>
                 </div>
             </nav>
 
