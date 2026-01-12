@@ -1,7 +1,7 @@
 # 📘 SpendWise - Proje Dokümantasyonu
 
-**Sürüm:** v1.1.0
-**Oluşturulma Tarihi:** 01 Ocak 2026
+**Sürüm:** v1.2.0
+**Güncelleme Tarihi:** 12 Ocak 2026
 
 ## 1. Proje Özeti
 **SpendWise**, bireysel kullanıcıların finansal durumlarını (gelir, gider, yatırım ve abonelikler) tek bir merkezden yönetmelerini sağlayan, modern web teknolojileri ile geliştirilmiş kapsamlı bir **Kişisel Finans ve E-Cüzdan** uygulamasıdır. Kullanıcı dostu arayüzü, mobil uyumluluğu ve gelişmiş analiz araçları ile finansal farkındalığı artırmayı hedefler.
@@ -47,7 +47,7 @@ Uygulama, her biri belirli bir finansal ihtiyacı karşılayan 7 ana modülden o
 *   **Genel Bakış:** Toplam bakiye, anlık gelir/gider durumu ve finansal trend butonu.
 *   **Son İşlemler:** Eklenen harcamaların listesi (filtreleme ve düzenleme/silme seçenekleriyle).
 *   **Hızlı Ekleme:** Gelir veya gider kalemlerinin (nakit/kredi kartı seçimiyle) hızlıca sisteme girilmesi.
-*   **Bildirim Merkezi:** Yaklaşan abonelik ödemeleri ve planlı harcamalar için akıllı uyarı sistemi (süre dolumuna 3 gün kala uyarı).
+*   **Bildirim Merkezi:** Yaklaşan abonelik ödemeleri ve planlı harcamalar için akıllı uyarı sistemi. Kullanıcıyı yormamak için **sadece 15 gün içinde** ödemesi olan işlemleri gösterir.
 *   **CSV Dışa Aktar:** İşlem geçmişinin Excel/CSV formatında indirilmesi.
 
 ### 📅 C. Takvim (Calendar)
@@ -73,17 +73,18 @@ Uygulama, her biri belirli bir finansal ihtiyacı karşılayan 7 ana modülden o
 *   **Otomatik Piyasa Verisi:** Harici API'ler kullanılarak güncel kurların tek tuşla çekilmesi.
 
 ### 📈 G. Raporlar (Reports)
-*   **Akıllı Rapor Analizi (AI):**
-    *   **Yapay Zeka Özeti (Smart Narrative):** Finansal durumu doğal dille özetleyen ("Giderler %10 azaldı") dinamik metin alanı.
+*   **Akıllı Rapor Analizi (AI v2.0):**
+    *   **Yapay Zeka Özeti ve Akıllı Tavsiyeler:** Finansal durumu doğal dille özetleyen ve "Eğlence harcamalarını %10 azaltarak X TL biriktir" gibi somut aksiyon önerileri sunan asistan.
+    *   **Finansal Sağlık Puanı:** Tasarruf oranı, bütçe dengesi ve ihtiyaç/istek oranına göre hesaplanan **0-100 arası** canlı performans puanı (Dairesel grafik gösterimi).
     *   **Anomali Dedektörü:** Normalin dışına çıkan ani harcama artışlarını tespit edip uyaran sistem.
-    *   **İhtiyaç vs. İstek:** Harcamaların %50/30/20 kuralına göre "Zorunlu" ve "Keyfi" olarak analiz edilmesi.
-    *   **Gelecek Tahmini:** Mevcut harcama hızıyla yıl sonu bakiye projeksiyonu.
-*   **Detaylı Grafikler:** Gelir/Gider dağılımının zaman çizelgesi üzerinde analizi.
+    *   **Gelişmiş Gelecek Tahmini:** Mevcut harcama hızıyla yıl sonu bakiye projeksiyonu ve zorunlu giderlerin görselleştirilmesi.
+*   **Detaylı Grafikler:** Gelir/Gider dağılımının zaman çizelgesi üzerinde analizi, kategori pasta grafiği ve aylık karşılaştırma çubukları.
 
 ### ⚙️ H. Ayarlar (Settings)
 *   **Kart Yönetimi:** Harcamalarda seçilmek üzere kredi kartlarının tanımlanması.
-*   **Kişiselleştirme:** Özel gelir/gider kategorileri ekleme.
-*   **Profil:** Şifre güncelleme ve tema (Karanlık/Aydınlık mod) ayarları.
+*   **Bildirim Ayarları (Yeni):** Bütçe aşımı ve abonelik hatırlatıcılarının açılıp kapatılabilmesi.
+*   **Profil Ayarları:** Profil fotoğrafı URL'si ekleme, Görünen Ad değiştirme yeteneği. Dashboard menüsünden hızlı erişim.
+*   **Kişiselleştirme:** Özel gelir/gider kategorileri ekleme, Tema ve Para Birimi ayarları.
 
 ---
 
